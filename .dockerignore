@@ -1,0 +1,18 @@
+# Ignora tudo que não é necessário para o build/run no container
+target/
+*.class
+*.jar
+.git/
+.gitignore
+.kiro/
+.idea/
+*.iml
+*.log
+logs/*
+saida/*
+entrada/*
+README_MELHORIAS.md
+
+# A base de portabilidade é grande (~1,6 GB); é montada via volume no compose.
+# Os CSVs/JSON abaixo SÃO copiados para a imagem (não ignorar).
+base_portabilidade/

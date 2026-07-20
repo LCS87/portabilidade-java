@@ -1,0 +1,22 @@
+services:
+  portabilidade:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portabilidade-java:latest
+    container_name: portabilidade-java
+    # Monta a base de portabilidade (grande ~1,6 GB) como volume, evitando
+    # copiá-la para dentro da imagem.
+    # IMPORTANTE: a base NÃO pode ser :ro (read-only) — o driver DuckDB JDBC
+    # precisa de acesso de escrita para criar o lock/-wal temporário, mesmo em
+    # modo somente-leitura. Use rw (padrão).
+    volumes:
+      - ./base_portabilidade:/app/base_portabilidade
+      - ./entrada:/app/entrada
+      - ./saida:/app/saida
+      - ./logs:/app/logs
+      - ./Operadoras.csv:/app/Operadoras.csv:ro
+      - ./Operadoras_completo.csv:/app/Operadoras_completo.csv:ro
+      - ./prefixos_operadora.json:/app/prefixos_operadora.json:ro
+    # Roda o batch uma vez e encerra (--rm remove o container ao final)
+    restart: "no"
