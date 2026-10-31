@@ -20,7 +20,6 @@ spring:
       enabled: true
   rabbitmq:
     # Fase 4: fila duravel de jobs batch (usada apenas com FEATURE_BATCH_QUEUE=true)
-  rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}

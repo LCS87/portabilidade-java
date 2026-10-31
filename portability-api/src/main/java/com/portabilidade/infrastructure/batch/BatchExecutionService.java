@@ -69,9 +69,9 @@ public class BatchExecutionService {
         CsvOutputWriter.StreamingCsvWriter out = null;
         try {
             Files.createDirectories(outputDir);
-            // UTF-8 sem BOM: consumo programático/download pela API
+            // UTF-8 sem BOM + vírgula: consumo programático/download pela API
             out = new CsvOutputWriter.StreamingCsvWriter(
-                    outputDir.resolve("batch_" + job.getId() + ".csv"), false);
+                    outputDir.resolve("batch_" + job.getId() + ".csv"), false, ',');
             Iterator<Map<String, String>> it = reader.stream(file.toString());
             List<String> buffer = new ArrayList<>(chunkSize);
             boolean headerWritten = false;
