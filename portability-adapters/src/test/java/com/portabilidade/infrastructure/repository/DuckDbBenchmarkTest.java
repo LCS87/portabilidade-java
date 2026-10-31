@@ -39,12 +39,11 @@ class DuckDbBenchmarkTest {
              Statement st = c.createStatement()) {
             st.execute("CREATE TABLE portabilidade (telefone BIGINT, rn1 VARCHAR)");
             // geração da base via SQL do próprio DuckDB (rápido, sem round-trip JDBC)
-            st.execute("""
-                INSERT INTO portabilidade
-                SELECT 11000000000 + (range % 200000000)::BIGINT AS telefone,
-                       lpad(((range % 99999) + 1)::VARCHAR, 5, '0') AS rn1
-                FROM range(%d)
-                """.formatted(BASE_ROWS));
+            // SQL literal: evita conflito entre '%' de módulo e formatador String.formatted
+            st.execute("INSERT INTO portabilidade "
+                    + "SELECT 11000000000 + (range % 200000000)::BIGINT AS telefone, "
+                    + "lpad(((range % 99999) + 1)::VARCHAR, 5, '0') AS rn1 "
+                    + "FROM range(" + BASE_ROWS + ")");
         }
     }
 
