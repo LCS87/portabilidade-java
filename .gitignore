@@ -1,8 +1,7 @@
 target/
 logs/
-*.duckdb
-
-# Frontend
-portability-frontend/node_modules/
-portability-frontend/dist/
+*.log
+node_modules/
+dist/
+build/
 .angular/
