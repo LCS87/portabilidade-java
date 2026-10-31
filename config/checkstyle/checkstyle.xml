@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+  "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+  "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Checkstyle mínimo para a Fase 0: pega problemas reais de código
+  (imports não usados, tabs, strings ==), sem ruído estilístico.
+  Roda em modo aviso (failOnViolation=false no parent pom).
+-->
+<module name="Checker">
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="warning"/>
+  <property name="fileExtensions" value="java"/>
+
+  <module name="LineLength">
+    <property name="max" value="160"/>
+    <property name="ignorePattern" value="^package.*|^import.*|https?://"/>
+  </module>
+
+  <module name="TreeWalker">
+    <module name="UnusedImports"/>
+    <module name="RedundantImport"/>
+    <module name="IllegalImport"/>
+    <module name="EqualsHashCode"/>
+    <module name="StringLiteralEquality"/>
+    <module name="SimplifyBooleanExpression"/>
+    <module name="SimplifyBooleanReturn"/>
+    <module name="EmptyCatchBlock">
+      <property name="exceptionVariableName" value="ignored|expected"/>
+    </module>
+    <module name="MissingSwitchDefault"/>
+    <module name="FallThrough"/>
+    <module name="OneTopLevelClass"/>
+    <module name="NoLineWrap"/>
+    <module name="UpperEll"/>
+    <module name="ArrayTypeStyle"/>
+  </module>
+</module>

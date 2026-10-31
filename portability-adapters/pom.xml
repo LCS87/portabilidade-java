@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.portabilidade</groupId>
+        <artifactId>portabilidade-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>portability-adapters</artifactId>
+    <name>Portabilidade - Adapters (DuckDB, JSON, CSV/XLSX)</name>
+
+    <!--
+      Adapters de infraestrutura (lado de fora da hexágono):
+      implementam os ports do core. Depende só do core + libs técnicas.
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>com.portabilidade</groupId>
+            <artifactId>portability-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.duckdb</groupId>
+            <artifactId>duckdb_jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
+        </dependency>
+
+        <!-- Logback apenas para testes de integração deste módulo -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -6,132 +6,197 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.portabilidade</groupId>
-    <artifactId>portabilidade-java</artifactId>
+    <artifactId>portabilidade-parent</artifactId>
     <version>1.0.0</version>
-    <packaging>jar</packaging>
-    <name>Portabilidade Numerica Batch</name>
+    <packaging>pom</packaging>
+    <name>Portabilidade Numerica - Parent</name>
+
+    <!--
+      Fase 0 do PLANO_MELHORIAS.md:
+        - Java 21 (virtual threads, record patterns)
+        - Multi-módulo Maven: core / adapters / batch (api e bff entram na Fase 2-3)
+        - BOM do Spring Boot 3.x importado no dependencyManagement para alinhar
+          Jackson/SLF4J/JUnit com a versão que a API usará depois
+        - CI (GitHub Actions), JaCoCo (gate de cobertura) e Checkstyle
+    -->
+
+    <modules>
+        <module>portability-core</module>
+        <module>portability-adapters</module>
+        <module>portability-batch</module>
+        <!-- Fase 2: <module>portability-api</module> -->
+        <!-- Fase 3: <module>portability-bff</module> -->
+    </modules>
 
     <properties>
-        <java.version>17</java.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <spring-boot.version>3.3.5</spring-boot.version>
+
+        <duckdb.version>1.1.3</duckdb.version>
+        <poi.version>5.3.0</poi.version>
+        <opencsv.version>5.9</opencsv.version>
+        <slf4j.version>2.0.13</slf4j.version>
+        <logback.version>1.5.6</logback.version>
+        <junit.version>5.11.0</junit.version>
+        <mockito.version>5.12.0</mockito.version>
+
+        <jacoco.version>0.8.12</jacoco.version>
+        <checkstyle.version>10.17.0</checkstyle.version>
+        <maven-checkstyle-plugin.version>3.5.0</maven-checkstyle-plugin.version>
+        <maven-surefire.version>3.3.1</maven-surefire.version>
+        <maven-compiler.version>3.13.0</maven-compiler.version>
+        <maven-assembly.version>3.7.1</maven-assembly.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- BOM do Spring Boot: alinha Jackson, SLF4J, Logback, JUnit, Mockito -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Dependências próprias -->
+            <dependency>
+                <groupId>org.duckdb</groupId>
+                <artifactId>duckdb_jdbc</artifactId>
+                <version>${duckdb.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi</artifactId>
+                <version>${poi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.opencsv</groupId>
+                <artifactId>opencsv</artifactId>
+                <version>${opencsv.version}</version>
+            </dependency>
+
+            <!-- Módulos internos -->
+            <dependency>
+                <groupId>com.portabilidade</groupId>
+                <artifactId>portability-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.portabilidade</groupId>
+                <artifactId>portability-adapters</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Test libs disponíveis para todos os módulos -->
     <dependencies>
-        <!-- DuckDB JDBC -->
-        <dependency>
-            <groupId>org.duckdb</groupId>
-            <artifactId>duckdb_jdbc</artifactId>
-            <version>1.1.3</version>
-        </dependency>
-
-        <!-- Apache POI para .xlsx -->
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi</artifactId>
-            <version>5.3.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-            <version>5.3.0</version>
-        </dependency>
-
-        <!-- OpenCSV para CSV com delimitador ; -->
-        <dependency>
-            <groupId>com.opencsv</groupId>
-            <artifactId>opencsv</artifactId>
-            <version>5.9</version>
-        </dependency>
-
-        <!-- Jackson para parse do JSON de prefixos -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.18.0</version>
-        </dependency>
-
-        <!-- SLF4J + Logback -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.13</version>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.5.6</version>
-        </dependency>
-
-        <!-- JUnit 5 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.11.0</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.12.0</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.12.0</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${maven-assembly.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
-            <!-- Compilador Java 17 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>${maven-compiler.version}</version>
                 <configuration>
-                    <source>17</source>
-                    <target>17</target>
+                    <release>${maven.compiler.release}</release>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
 
-            <!-- Fat JAR via assembly plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.7.1</version>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                    <archive>
-                        <manifest>
-                            <mainClass>com.portabilidade.PortabilityApplication</mainClass>
-                        </manifest>
-                    </archive>
-                    <finalName>portabilidade-java</finalName>
-                    <appendAssemblyId>false</appendAssemblyId>
-                </configuration>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire.version}</version>
+            </plugin>
+
+            <!-- Cobertura de testes (gate: ver jacoco-check nos módulos) -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
+                        <id>prepare-agent</id>
                         <goals>
-                            <goal>single</goal>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- Surefire para JUnit 5 -->
+            <!-- Estilo de código (aviso; falha desativada até limpar o legado) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.3.1</version>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${maven-checkstyle-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>${checkstyle.version}</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>config/checkstyle/checkstyle.xml</configLocation>
+                    <consoleOutput>true</consoleOutput>
+                    <failOnViolation>false</failOnViolation>
+                    <violationSeverity>warning</violationSeverity>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle-validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
