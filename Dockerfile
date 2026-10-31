@@ -1,21 +1,26 @@
 # ---- Stage 1: build ----
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
-# Copia apenas os arquivos de dependência primeiro para aproveitar o cache do Docker
+# Copia os POMs do multi-módulo primeiro para aproveitar o cache do Docker
 COPY pom.xml .
+COPY portability-core/pom.xml portability-core/
+COPY portability-adapters/pom.xml portability-adapters/
+COPY portability-batch/pom.xml portability-batch/
 RUN mvn -B -q dependency:go-offline || true
 
 # Copia o código-fonte e compila o fat-jar
-COPY src ./src
+COPY portability-core/src portability-core/src
+COPY portability-adapters/src portability-adapters/src
+COPY portability-batch/src portability-batch/src
 RUN mvn -B -q clean package -DskipTests
 
 # ---- Stage 2: runtime ----
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Copia o jar gerado
-COPY --from=build /build/target/portabilidade-java.jar /app/portabilidade-java.jar
+# Copia o jar gerado (fat-jar montado pelo módulo portability-batch)
+COPY --from=build /build/portability-batch/target/portabilidade-java.jar /app/portabilidade-java.jar
 
 # Copia os dados auxiliares (dicionários, prefixos).
 # A base DuckDB (base_portabilidade/, ~1,6 GB) NÃO é copiada para a imagem:

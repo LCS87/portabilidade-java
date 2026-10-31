@@ -50,21 +50,6 @@ class AdaptersIntegrationTest {
                         """);
             }
 
-            // DIAGNÓSTICO: verifica o estado da base na MESMA conexão do fixture
-            System.err.println("[diag] fixture file exists=" + java.nio.file.Files.exists(db)
-                    + " size=" + java.nio.file.Files.size(db));
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT telefone, rn1 FROM portabilidade ORDER BY telefone")) {
-                while (rs.next()) {
-                    System.err.println("[diag] fixture row: " + rs.getLong(1) + " -> '" + rs.getString(2) + "'");
-                }
-            }
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT database_path(), current_setting('threads')")) {
-                if (rs.next()) {
-                    System.err.println("[diag] db path=" + rs.getString(1) + " threads=" + rs.getString(2));
-                }
-            }
         }
 
         var repo = new DuckDbPortabilityRepository(db.toString());

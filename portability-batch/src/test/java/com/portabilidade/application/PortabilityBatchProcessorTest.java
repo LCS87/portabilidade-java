@@ -37,9 +37,23 @@ class PortabilityBatchProcessorTest {
         if (numbers.contains(11987654321L)) return Map.of(11987654321L, "55321");
         return Map.of();
     };
-    /** Stub: prefixo 7 dígitos "2191234" → VIVO. */
-    private static final PrefixResolver STUB_PREFIX = digits ->
-            (digits != null && digits.startsWith("2191234")) ? "VIVO" : null;
+    /**
+     * Stub: resolve prefixo de celular (10d ou 11d) que começa com "2191234".
+     * O fixture usa o fixo antigo "2112345678" (DDD 21 + 8 dígitos), cuja forma
+     * de 11 dígitos é "21912345678" — por isso o teste também aceita candidatos
+     * com nono dígito inserido na posição 3, espelhando o comportamento do
+     * JsonPrefixResolver real.
+     */
+    private static final PrefixResolver STUB_PREFIX = digits -> {
+        if (digits == null) return null;
+        if (digits.startsWith("2191234")) return "VIVO";
+        // fixo 10d → candidato 11d (insere '9' após o DDD)
+        if (digits.length() == 10) {
+            String candidate = digits.substring(0, 2) + "9" + digits.substring(2);
+            if (candidate.startsWith("2191234")) return "VIVO";
+        }
+        return null;
+    };
 
     @BeforeEach
     void setUp() {
