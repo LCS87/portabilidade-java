@@ -1,0 +1,17 @@
+2026-10-31 01:27:58.031 [main] INFO  c.p.PortabilityApplication - Portabilidade Numérica Batch — iniciando
+2026-10-31 01:27:58.035 [main] INFO  c.p.application.config.AppPaths - BASE_DIR resolvido: /workspace/portability-batch/target
+2026-10-31 01:27:58.037 [main] INFO  c.p.PortabilityApplication - Caminhos configurados:
+2026-10-31 01:27:58.037 [main] INFO  c.p.PortabilityApplication -   entrada/         : /workspace/portability-batch/target/entrada
+2026-10-31 01:27:58.037 [main] INFO  c.p.PortabilityApplication -   saida/           : /workspace/portability-batch/target/saida
+2026-10-31 01:27:58.037 [main] INFO  c.p.PortabilityApplication -   DuckDB           : /workspace/portability-batch/target/base_portabilidade/portabilidade.duckdb
+2026-10-31 01:27:58.037 [main] INFO  c.p.PortabilityApplication -   Operadoras.csv   : /workspace/portability-batch/target/Operadoras.csv
+2026-10-31 01:27:58.037 [main] INFO  c.p.PortabilityApplication -   prefixos JSON    : /workspace/portability-batch/target/prefixos_operadora.json
+2026-10-31 01:27:58.038 [main] WARN  c.p.i.loader.CsvOperatorLoader - Arquivo Operadoras.csv não encontrado em: /workspace/portability-batch/target/Operadoras.csv
+2026-10-31 01:27:58.038 [main] INFO  c.p.PortabilityApplication - Dicionário de operadoras (exemplo): 0 entradas
+2026-10-31 01:27:58.038 [main] WARN  c.p.PortabilityApplication - Nenhum dicionário completo de operadoras encontrado — usando o de exemplo (baixa cobertura).
+2026-10-31 01:27:58.329 [main] WARN  c.p.i.loader.JsonPrefixMapLoader - Arquivo de prefixos não encontrado em: /workspace/portability-batch/target/prefixos_operadora.json
+2026-10-31 01:27:58.330 [main] INFO  c.p.PortabilityApplication - Mapa de prefixos: 0 entradas
+2026-10-31 01:27:58.334 [main] INFO  c.p.a.PortabilityBatchProcessor - === Portabilidade Numérica Batch - Iniciando ===
+2026-10-31 01:27:58.340 [main] WARN  c.p.infrastructure.file.FileScanner - Nenhum arquivo .csv ou .xlsx encontrado em: /workspace/portability-batch/target/entrada
+2026-10-31 01:27:58.341 [main] WARN  c.p.a.PortabilityBatchProcessor - Nenhum arquivo encontrado em '/workspace/portability-batch/target/entrada'. Encerrando.
+2026-10-31 01:27:58.341 [main] INFO  c.p.PortabilityApplication - Portabilidade Numérica Batch — concluído com sucesso
