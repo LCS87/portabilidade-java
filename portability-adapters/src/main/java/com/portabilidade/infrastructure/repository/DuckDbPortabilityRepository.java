@@ -33,7 +33,7 @@ import java.util.*;
  * A tabela esperada no DuckDB tem pelo menos as colunas:
  *   telefone BIGINT, rn1 VARCHAR
  */
-public class DuckDbPortabilityRepository implements PortabilityRepository {
+public class DuckDbPortabilityRepository implements PortabilityRepository, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(DuckDbPortabilityRepository.class);
     private static final int BATCH_SIZE = 50_000;

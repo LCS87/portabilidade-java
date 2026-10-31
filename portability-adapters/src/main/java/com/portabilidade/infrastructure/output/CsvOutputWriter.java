@@ -45,13 +45,17 @@ public class CsvOutputWriter {
             log.warn("Nenhuma linha para escrever no output de '{}'", originalName);
             return null;
         }
-        try (StreamingCsvWriter w = open(originalName, outputDir)) {
+        StreamingCsvWriter w = null;
+        try {
+            w = open(originalName, outputDir);
             for (Map<String, Object> row : rows) {
                 w.writeRow(row);
             }
         } catch (IOException e) {
             log.error("Erro ao escrever arquivo de saída: {}", e.getMessage());
             return null;
+        } finally {
+            try { if (w != null) w.close(); } catch (IOException ignored) { }
         }
         String path = w.path();
         log.info("Arquivo gerado: {} ({} linhas)", path, w.rowsWritten());

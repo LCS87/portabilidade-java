@@ -61,9 +61,14 @@ public class PortabilityBatchProcessor {
             }
             log.info("{} arquivo(s) encontrados", inputFiles.size());
 
-            // 2. Processar cada arquivo individualmente (fluxo streaming)
+            // 2. Processar cada arquivo individualmente com isolamento de erros:
+            // falha em um arquivo (leitor ausente, formato inválido) não derruba a execução
             for (String filePath : inputFiles) {
-                processFile(filePath);
+                try {
+                    processFile(filePath);
+                } catch (Exception e) {
+                    log.error("Falha ao processar '{}': {}", filePath, e.getMessage());
+                }
             }
 
             long elapsed = System.currentTimeMillis() - start;
@@ -94,12 +99,21 @@ public class PortabilityBatchProcessor {
             return;
         }
 
+        // Fase 1: peek na primeira linha para validar a coluna "telefone" antes
+        // de criar qualquer arquivo de saída (arquivos sem a coluna são ignorados).
+        Map<String, String> firstRow = source.next();
+        if (firstRow.get("telefone") == null) {
+            log.warn("Coluna 'telefone' não encontrada em '{}'; arquivo ignorado", fileName);
+            return;
+        }
+
         try {
             CsvOutputWriter.StreamingCsvWriter out =
                     outputWriter.open(Path.of(filePath).getFileName().toString(), paths.getOutputDir());
             boolean ok = false;
             try {
                 List<Map<String, String>> chunk = new ArrayList<>(STREAM_CHUNK_SIZE);
+                chunk.add(firstRow);
                 while (source.hasNext()) {
                     chunk.add(source.next());
                     if (chunk.size() >= STREAM_CHUNK_SIZE) {
@@ -150,13 +164,10 @@ public class PortabilityBatchProcessor {
     private List<Map<String, Object>> enrichRowsByPosition(List<Map<String, String>> inputRows,
                                                            ProcessResult result) {
         List<Map<String, Object>> enriched = new ArrayList<>(inputRows.size());
-        Long[] operators = result.operators();
-        String[] sources = result.sources();
-
         for (int i = 0; i < inputRows.size(); i++) {
             Map<String, Object> newRow = new LinkedHashMap<>(inputRows.get(i));
-            newRow.put("operadora", operators[i]);
-            newRow.put("fonte_consulta", sources[i]);
+            newRow.put("operadora", result.operatorAt(i));
+            newRow.put("fonte_consulta", result.sourceAt(i));
             enriched.add(newRow);
         }
         return enriched;

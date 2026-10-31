@@ -97,8 +97,10 @@ public class ExcelInputReader implements InputFileReader {
                     SAXParserFactory factory = SAXParserFactory.newInstance();
                     factory.setNamespaceAware(true);
                     SAXParser parser = factory.newSAXParser();
-                    parser.getXMLReader().setContentHandler(new RowCollector(sst));
-                    parser.parse(new InputSource(sheetStream));
+                    org.xml.sax.XMLReader xmlReader = parser.getXMLReader();
+                    RowCollector handler = new RowCollector(sst);
+                    xmlReader.setContentHandler(handler);
+                    xmlReader.parse(new InputSource(sheetStream));
                 } catch (Exception e) {
                     synchronized (lock) { error = e; lock.notifyAll(); }
                 } finally {
@@ -248,7 +250,7 @@ public class ExcelInputReader implements InputFileReader {
         return col - 1;
     }
 
-    private String[] normalizeHeaders(List<String> rawCells) {
+    private static String[] normalizeHeaders(List<String> rawCells) {
         String[] result = new String[rawCells.size()];
         for (int i = 0; i < rawCells.size(); i++) {
             String h = rawCells.get(i).trim().toLowerCase()
