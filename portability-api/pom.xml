@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.portabilidade</groupId>
+        <artifactId>portabilidade-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>portability-api</artifactId>
+    <name>Portabilidade API (Fase 2 - Spring Boot / hexagonal)</name>
+
+    <!--
+      Fase 2 do PLANO_MELHORIAS.md:
+        application/          = use cases dependendo só de ports (core)
+        infrastructure/web    = controllers + DTOs (adaptadores de entrada)
+        infrastructure/*      = adaptadores de saída (DuckDB/JSON/CSV reutilizados
+                                de portability-adapters; batch store em memória)
+      Composição via @Configuration (Spring Boot 3.3 / Java 21).
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>com.portabilidade</groupId>
+            <artifactId>portability-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.portabilidade</groupId>
+            <artifactId>portability-adapters</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- OpenAPI 3 (springdoc) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- Cache L1: Caffeine -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- Testes -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>boot</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
