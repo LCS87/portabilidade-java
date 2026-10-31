@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 /**
  * Implementação de PortabilityRepository usando DuckDB JDBC (read-only).
@@ -91,30 +91,61 @@ public class DuckDbPortabilityRepository implements PortabilityRepository {
         return result;
     }
 
+    /**
+     * Consulta um lote via staging table + JOIN.
+     *
+     * Evita o uso de prepared statements com IN (?, ?, ...) e bind por índice,
+     * que apresentam comportamento instável no driver DuckDB JDBC (parâmetros
+     * podiam ser ignorados/zerados, retornando resultados errados). A abordagem
+     * de staging table é determinística e continua eficiente para lotes grandes
+     * (o planner do DuckDB faz hash-join contra a tabela de consulta).
+     */
     private Map<Long, String> queryBatch(Connection conn, List<Long> batch) throws SQLException {
-        String placeholders = batch.stream()
-                .map(n -> "?")
-                .collect(Collectors.joining(","));
+        Map<Long, String> batchResult = new HashMap<>();
+        if (batch.isEmpty()) return batchResult;
 
-        String sql = "SELECT telefone, rn1 FROM portabilidade WHERE telefone IN (" + placeholders + ")";
-
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < batch.size(); i++) {
-                ps.setLong(i + 1, batch.get(i));
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE TEMPORARY TABLE IF NOT EXISTS tmp_query_batch (telefone BIGINT)");
+        }
+        try {
+            // Limpa o lote anterior e popula o atual em uma única transação de statements.
+            try (Statement st = conn.createStatement()) {
+                st.execute("DELETE FROM tmp_query_batch");
             }
 
-            Map<Long, String> batchResult = new HashMap<>();
-            try (ResultSet rs = ps.executeQuery()) {
+            String insertSql = "INSERT INTO tmp_query_batch (telefone) VALUES (?)";
+            try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                for (long phone : batch) {
+                    ps.setLong(1, phone);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+
+            String joinSql = """
+                    SELECT q.telefone AS telefone, p.rn1 AS rn1
+                    FROM tmp_query_batch q
+                    JOIN portabilidade p ON p.telefone = q.telefone
+                    """;
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery(joinSql)) {
                 while (rs.next()) {
                     long telefone = rs.getLong("telefone");
                     String rn1 = rs.getString("rn1");
                     if (rn1 != null && !rn1.isBlank()) {
-                        batchResult.put(telefone, rn1.trim());
+                        batchResult.putIfAbsent(telefone, rn1.trim());
                     }
                 }
             }
-            return batchResult;
+        } finally {
+            try (Statement st = conn.createStatement()) {
+                st.execute("DELETE FROM tmp_query_batch");
+            } catch (SQLException cleanupEx) {
+                log.debug("Falha ao limpar tmp_query_batch: {}", cleanupEx.getMessage());
+            }
         }
+
+        return batchResult;
     }
 
     /**

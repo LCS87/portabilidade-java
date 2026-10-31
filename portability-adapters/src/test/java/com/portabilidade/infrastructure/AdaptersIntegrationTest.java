@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,10 +39,31 @@ class AdaptersIntegrationTest {
         try (Connection conn = DriverManager.getConnection("jdbc:duckdb:" + db)) {
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TABLE portabilidade (telefone BIGINT, rn1 VARCHAR)");
-                st.execute("INSERT INTO portabilidade VALUES "
-                        + "(1133334444, '55321'),   -- fixo 10d: fallback do 11d 11933334444"
-                        + "(21912345678, '12345'),  -- celular direto"
-                        + "(31999999999, '')");  // rn1 vazio → deve ser ignorado
+                // IMPORTANTE: DuckDB trata "--" como início de comentário até o fim da LINHA.
+                // Os comentários precisam ir em linhas separadas; no meio de um INSERT com
+                // múltiplos VALUES eles "engolem" a linha seguinte e corrompem os dados.
+                st.execute("""
+                        INSERT INTO portabilidade VALUES
+                        (1133334444, '55321'),    -- fixo 10d: fallback do 11d 11933334444
+                        (21912345678, '12345'),   -- celular direto
+                        (31999999999, '')         -- rn1 vazio → deve ser ignorado
+                        """);
+            }
+
+            // DIAGNÓSTICO: verifica o estado da base na MESMA conexão do fixture
+            System.err.println("[diag] fixture file exists=" + java.nio.file.Files.exists(db)
+                    + " size=" + java.nio.file.Files.size(db));
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT telefone, rn1 FROM portabilidade ORDER BY telefone")) {
+                while (rs.next()) {
+                    System.err.println("[diag] fixture row: " + rs.getLong(1) + " -> '" + rs.getString(2) + "'");
+                }
+            }
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT database_path(), current_setting('threads')")) {
+                if (rs.next()) {
+                    System.err.println("[diag] db path=" + rs.getString(1) + " threads=" + rs.getString(2));
+                }
             }
         }
 
