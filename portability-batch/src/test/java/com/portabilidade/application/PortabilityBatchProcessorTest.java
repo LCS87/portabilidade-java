@@ -32,14 +32,33 @@ class PortabilityBatchProcessorTest {
     private AppPaths paths;
     private final List<InputFileReader> readers = List.of(new CsvInputReader());
 
+    /** Contagem de chamadas ao repo — usada para verificar deduplicação em lote. */
+    private static final java.util.concurrent.atomic.AtomicInteger repoCalls =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     /** Stub: DuckDB encontra apenas 11987654321 → rn1 55321 (CLARO). */
     private static final PortabilityRepository STUB_REPO = numbers -> {
+        repoCalls.incrementAndGet();
         if (numbers.contains(11987654321L)) return Map.of(11987654321L, "55321");
         return Map.of();
     };
-    /** Stub: prefixo 7 dígitos "2191234" → VIVO. */
-    private static final PrefixResolver STUB_PREFIX = digits ->
-            (digits != null && digits.startsWith("2191234")) ? "VIVO" : null;
+    /**
+     * Stub: resolve prefixo de celular (10d ou 11d) que começa com "2191234".
+     * O fixture usa o fixo antigo "2112345678" (DDD 21 + 8 dígitos), cuja forma
+     * de 11 dígitos é "21912345678" — por isso o teste também aceita candidatos
+     * com nono dígito inserido na posição 3, espelhando o comportamento do
+     * JsonPrefixResolver real.
+     */
+    private static final PrefixResolver STUB_PREFIX = digits -> {
+        if (digits == null) return null;
+        if (digits.startsWith("2191234")) return "VIVO";
+        // fixo 10d → candidato 11d (insere '9' após o DDD)
+        if (digits.length() == 10) {
+            String candidate = digits.substring(0, 2) + "9" + digits.substring(2);
+            if (candidate.startsWith("2191234")) return "VIVO";
+        }
+        return null;
+    };
 
     @BeforeEach
     void setUp() {
@@ -94,6 +113,32 @@ class PortabilityBatchProcessorTest {
         buildProcessor().run();
         assertFalse(Path.of(paths.getOutputDir()).toFile().exists()
                 && listOutput().size() > 0);
+    }
+
+    @Test
+    @DisplayName("streaming em chunks: arquivo maior que o chunk é processado por lotes")
+    void streamsInChunks() throws Exception {
+        Path inputDir = Path.of(paths.getInputDir());
+        Files.createDirectories(inputDir);
+        StringBuilder csv = new StringBuilder("telefone\n");
+        int n = PortabilityBatchProcessor.STREAM_CHUNK_SIZE + 137; // força 2 chunks
+        for (int i = 0; i < n; i++) {
+            csv.append(i == 0 ? "11987654321" : "4188888888" + "").append('\n');
+        }
+        Files.writeString(inputDir.resolve("grande.csv"), csv.toString(), StandardCharsets.UTF_8);
+
+        int callsBefore = repoCalls.get();
+        buildProcessor().run();
+        int callsAfter = repoCalls.get();
+
+        List<Path> outputs = listOutput();
+        assertEquals(1, outputs.size());
+        String content = Files.readString(outputs.get(0), StandardCharsets.UTF_8);
+        String[] lines = content.replace("\uFEFF", "").trim().split("\\R");
+        assertEquals(n + 1, lines.length, "header + todas as linhas preservadas");
+        assertTrue(lines[1].contains("CLARO"));
+        // 2 chunks → exatamente 2 chamadas ao repositório (fluxo em lotes, não linha a linha)
+        assertEquals(2, callsAfter - callsBefore, "resolução em lote por chunk");
     }
 
     @Test

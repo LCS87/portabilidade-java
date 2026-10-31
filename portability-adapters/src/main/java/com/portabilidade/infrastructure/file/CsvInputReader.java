@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,6 +18,9 @@ import java.util.*;
  * Detecta automaticamente o separador (; ou ,) e o charset (UTF-8 ou ISO-8859-1).
  * Normaliza os headers para lowercase sem espaços extras.
  * Garante que exista uma coluna "telefone" (tenta mapear variantes comuns).
+ *
+ * Fase 1: {@link #stream(String)} oferece leitura linha-a-linha (iterator)
+ * sem materializar o arquivo inteiro em memória.
  */
 public class CsvInputReader implements InputFileReader {
 
@@ -34,54 +39,93 @@ public class CsvInputReader implements InputFileReader {
 
     @Override
     public List<Map<String, String>> read(String filePath) {
+        // Compatibilidade: materializa o stream em lista.
+        List<Map<String, String>> rows = new ArrayList<>();
+        Iterator<Map<String, String>> it = stream(filePath);
+        while (it.hasNext()) rows.add(it.next());
+        log.info("CSV lido: {} linhas de '{}'", rows.size(), Path.of(filePath).getFileName());
+        return rows;
+    }
+
+    @Override
+    public Iterator<Map<String, String>> stream(String filePath) {
         Path path = Path.of(filePath);
         if (!Files.exists(path)) {
             throw new DataLoadingException("Arquivo não encontrado: " + filePath);
         }
 
-        // Tenta UTF-8 primeiro, depois ISO-8859-1
+        // Tenta UTF-8 primeiro, depois ISO-8859-1 — a detecção é feita lendo o
+        // header; o iterator resultante continua no mesmo charset escolhido.
+        Exception last = null;
         for (Charset charset : new Charset[]{StandardCharsets.UTF_8, Charset.forName("ISO-8859-1")}) {
             try {
-                List<Map<String, String>> result = doRead(path, charset);
-                log.info("CSV lido: {} linhas de '{}' (charset: {})", result.size(),
-                        path.getFileName(), charset);
-                return result;
-            } catch (DataLoadingException e) {
-                throw e;
+                BufferedReader reader = Files.newBufferedReader(path, charset);
+                String headerLine = reader.readLine();
+                if (headerLine == null) {
+                    reader.close();
+                    return Collections.emptyIterator();
+                }
+                return new CsvIterator(reader, headerLine, charset, path);
             } catch (Exception e) {
-                log.debug("Falha ao ler CSV com charset {}: {}", charset, e.getMessage());
+                last = e;
+                log.debug("Falha ao iniciar leitura CSV com charset {}: {}", charset, e.getMessage());
             }
         }
-        throw new DataLoadingException("Não foi possível ler o CSV: " + filePath);
+        throw new DataLoadingException("Não foi possível ler o CSV: " + filePath, last);
     }
 
-    private List<Map<String, String>> doRead(Path path, Charset charset) throws Exception {
-        try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
-            String headerLine = reader.readLine();
-            if (headerLine == null) return Collections.emptyList();
+    /** Iterator streaming: mantém apenas a linha corrente em memória. */
+    private final class CsvIterator implements Iterator<Map<String, String>> {
+        private final BufferedReader reader;
+        private final String[] headers;
+        private final char sep;
+        private final Path path;
+        private Map<String, String> next;
 
-            // Remove BOM
-            if (headerLine.startsWith("\uFEFF")) {
-                headerLine = headerLine.substring(1);
-            }
+        CsvIterator(BufferedReader reader, String headerLine, Charset charset, Path path) {
+            this.reader = reader;
+            this.path = path;
+            String hl = headerLine.startsWith("\uFEFF") ? headerLine.substring(1) : headerLine;
+            this.sep = detectSeparator(hl);
+            this.headers = normalizeHeaders(hl.split(String.valueOf(sep), -1));
+            advance();
+        }
 
-            char sep = detectSeparator(headerLine);
-            String[] rawHeaders = headerLine.split(String.valueOf(sep), -1);
-            String[] headers = normalizeHeaders(rawHeaders);
-
-            List<Map<String, String>> rows = new ArrayList<>();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isBlank()) continue;
-                String[] cols = splitLine(line, sep);
-                Map<String, String> row = new LinkedHashMap<>();
-                for (int i = 0; i < headers.length; i++) {
-                    String val = (i < cols.length) ? cols[i].trim().replaceAll("^[\"']|[\"']$", "") : "";
-                    row.put(headers[i], val);
+        private void advance() {
+            next = null;
+            try {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank()) continue;
+                    String[] cols = splitLine(line, sep);
+                    Map<String, String> row = new LinkedHashMap<>();
+                    for (int i = 0; i < headers.length; i++) {
+                        String val = (i < cols.length) ? cols[i].trim().replaceAll("^['\"]|['\"]$", "") : "";
+                        row.put(headers[i], val);
+                    }
+                    next = row;
+                    return;
                 }
-                rows.add(row);
+                // fim do arquivo — libera o recurso
+                reader.close();
+            } catch (IOException e) {
+                closeQuietly();
+                throw new UncheckedIOException("Erro ao fazer streaming do CSV: " + path, e);
             }
-            return rows;
+        }
+
+        @Override public boolean hasNext() { return next != null; }
+
+        @Override
+        public Map<String, String> next() {
+            if (next == null) throw new NoSuchElementException();
+            Map<String, String> cur = next;
+            advance();
+            return cur;
+        }
+
+        private void closeQuietly() {
+            try { reader.close(); } catch (IOException ignored) { }
         }
     }
 

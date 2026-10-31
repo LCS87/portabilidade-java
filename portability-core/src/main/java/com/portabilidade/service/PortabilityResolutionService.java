@@ -128,4 +128,12 @@ public class PortabilityResolutionService {
     private Long normalizeOne(String raw) {
         return raw == null ? null : normalizer.normalize(raw);
     }
+
+    /**
+     * Libera recursos do repositório (conexão DuckDB única por execução — Fase 1).
+     * Idempotente; chamado pelo orquestrador ao fim do batch.
+     */
+    public void close() {
+        repository.close();
+    }
 }

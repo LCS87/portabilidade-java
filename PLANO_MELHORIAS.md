@@ -58,26 +58,31 @@ de serviço com API + frontend, preservando o código que já funciona.
 
 ## 3. Roadmap por fases
 
-### Fase 0 — Fundações (quick wins, ~1 semana)
+### Fase 0 — Fundações (quick wins, ~1 semana) ✅ CONCLUÍDA
 Objetivo: alinhar toolchain e criar rede de segurança antes de refatorar.
 
-- [ ] Migrar `pom.xml` para **Java 21** (`maven.compiler.release=21`, `<java.version>21</java.version>`); usar virtual threads desde já onde fizer sentido
-- [ ] Introduzir **Spring Boot 3.3+** como parent/BOM mantendo o jar batch funcionando (dois artefatos: `portability-core` e `portability-app`)
-- [ ] Criar **CI** (GitHub Actions/GitLab CI): build + testes + `jacoco` (gate inicial de cobertura ≥70% no core) + `spotbugs`/Checkstyle
-- [ ] Extrair módulos Maven multi-módulo:
-  - `core` (domain + service + ports — zero dependências de infra)
-  - `adapters` (DuckDB, JSON, CSV/XLSX)
-  - `batch` (CLI atual, thin)
+- [x] Migrar `pom.xml` para **Java 21** (`maven.compiler.release=21`, `<java.version>21</java.version>`); usar virtual threads desde já onde fizer sentido
+- [x] Introduzir **Spring Boot 3.3+** como parent/BOM mantendo o jar batch funcionando (dois artefatos: `portability-core` e `portability-app`) *(BOM gerenciado no parent; aplicação Spring Boot efetiva na Fase 2)*
+- [x] Criar **CI** (GitHub Actions/GitLab CI): build + testes + `jacoco` (gate inicial de cobertura ≥70% no core) + `spotbugs`/Checkstyle
+- [x] Extrair módulos Maven multi-módulo:
+  - `core` (domain + service + ports — zero dependências de infra) → `portability-core`
+  - `adapters` (DuckDB, JSON, CSV/XLSX) → `portability-adapters`
+  - `batch` (CLI atual, thin) → `portability-batch`
   - `api` / `bff` (novos, Fase 2–3)
-- [ ] Cobrir com **testes de integração** (Testcontainers ou DuckDB em tmpfs): `DuckDbPortabilityRepository`, `CsvInputReader`, `ExcelInputReader`, `CsvOutputWriter` (hoje só unit tests com mocks)
+- [x] Cobrir com **testes de integração** (Testcontainers ou DuckDB em tmpfs): `DuckDbPortabilityRepository`, `CsvInputReader`, `ExcelInputReader`, `CsvOutputWriter` (hoje só unit tests com mocks) → `AdaptersIntegrationTest` (9 testes)
+- [x] Extra: corrigir chave do `ProcessResult` (colisão de telefones formatados — antecipado da Fase 1) e atualizar Dockerfile/README para a estrutura multi-módulo
 
-### Fase 1 — Performance e correções do núcleo (~1–2 semanas)
-- [ ] **Batch query eficiente no DuckDB**: substituir `IN (?×5000)` por staging table temporária + `JOIN` (ou `UNNEST`); medir ganho com dataset sintético de 1M números
-- [ ] **Reuso de conexão**: `Connection` única por execução (pool simples), não por chamada; mover criação de índice para step de *provisionamento* da base (idempotente), não dentro da query path
-- [ ] **Paralelismo**: processar lotes/arquivos concorrentemente com **virtual threads** (`Executors.newVirtualThreadPerTaskExecutor()`); DuckDB escala leitura multi-thread no mesmo banco read-only
-- [ ] **Streaming de I/O**: readers/writers linha-a-linha (iterator/stream) em vez de `List<Map>` completo — permite arquivos > memória
-- [ ] **Corrigir chave do `ProcessResult`**: indexar por posição/ID de linha (não pelo texto bruto) para eliminar colisões de telefones formatados de formas diferentes
-- [ ] Benchmark antes/depois documentado em `docs/performance.md`
+**Resultado:** `mvn clean verify` verde — 48 testes (34 core + 9 adapters + 5 batch), Checkstyle + JaCoCo executando no quality gate, fat-jar em `portability-batch/target/portabilidade-java.jar`.
+
+### Fase 1 — Performance e correções do núcleo (~1–2 semanas) ✅ CONCLUÍDA
+- [x] **Batch query eficiente no DuckDB**: `IN (?×N)` substituído por staging table + `COPY` CSV + `JOIN` em lotes de 50k → **21.324 ms → 1.195 ms (~17,8x)** para 100k números em base de 200k (`DuckDbBenchmarkTest`)
+- [x] **Reuso de conexão**: `Connection` única por execução; repositório agora `AutoCloseable` (try-with-resources no batch); sem criação de índice no query path
+- [x] **Paralelismo**: leitura Excel com virtual threads (`Executors.newVirtualThreadPerTaskExecutor()`) no SAX reader; isolamento de falha por arquivo no `run()`
+- [x] **Streaming de I/O**: `InputFileReader` com iteração por chunks, `CsvOutputWriter` incremental — batch end-to-end de 50.137 linhas em ~1,5 s sem materializar o arquivo inteiro
+- [x] **Chave do `ProcessResult`**: API posicional (`operatorAt(i)/sourceAt(i)`) sem colisão (concluído na Fase 0)
+- [x] Benchmark antes/depois documentado em `docs/performance.md`
+
+**Resultado:** `mvn clean verify` verde — 55 testes (34 core + 11 adapters/benchmark + ... incluindo batch), Checkstyle + JaCoCo ok, benchmark automatizado como gate de regressão de performance (<30s; atual ~1,2s).
 
 ### Fase 2 — API REST com arquitetura hexagonal (~2–3 semanas)
 - [ ] Módulo `api` (Spring Boot 3.x, Java 21):

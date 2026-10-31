@@ -50,21 +50,6 @@ class AdaptersIntegrationTest {
                         """);
             }
 
-            // DIAGNÓSTICO: verifica o estado da base na MESMA conexão do fixture
-            System.err.println("[diag] fixture file exists=" + java.nio.file.Files.exists(db)
-                    + " size=" + java.nio.file.Files.size(db));
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT telefone, rn1 FROM portabilidade ORDER BY telefone")) {
-                while (rs.next()) {
-                    System.err.println("[diag] fixture row: " + rs.getLong(1) + " -> '" + rs.getString(2) + "'");
-                }
-            }
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT database_path(), current_setting('threads')")) {
-                if (rs.next()) {
-                    System.err.println("[diag] db path=" + rs.getString(1) + " threads=" + rs.getString(2));
-                }
-            }
         }
 
         var repo = new DuckDbPortabilityRepository(db.toString());
@@ -83,6 +68,45 @@ class AdaptersIntegrationTest {
         var repo = new DuckDbPortabilityRepository("/caminho/inexistente.db");
         assertTrue(repo.findOperatorsByPhoneNumbers(null).isEmpty());
         assertTrue(repo.findOperatorsByPhoneNumbers(List.of()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("DuckDB: lote grande via staging+JOIN com deduplicação e performance (Fase 1)")
+    void duckDbLargeBatchStagingJoin() throws Exception {
+        Path db = tmp.resolve("grande.duckdb");
+        int baseRows = 20_000;
+        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:" + db)) {
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE TABLE portabilidade (telefone BIGINT, rn1 VARCHAR)");
+                StringBuilder sb = new StringBuilder("INSERT INTO portabilidade VALUES ");
+                for (int i = 0; i < baseRows; i++) {
+                    if (i > 0) sb.append(',');
+                    sb.append("(11").append(String.format("%09d", i)).append(", 'R")
+                      .append(i % 7).append("')");
+                }
+                st.execute(sb.toString());
+            }
+        }
+
+        long t0 = System.nanoTime();
+        try (var repo = new DuckDbPortabilityRepository(db.toString(), true)) {
+            // 3x o tamanho da base, com muitas duplicatas — deve consultar uma vez
+            // por lote e deduplicar internamente (staging table não explode).
+            List<Long> query = new java.util.ArrayList<>();
+            for (int rep = 0; rep < 3; rep++) {
+                for (int i = -1_000; i < baseRows + 1_000; i++) {
+                    query.add(11000000000L + Math.max(0, Math.min(i, baseRows - 1)));
+                }
+            }
+            Map<Long, String> result = repo.findOperatorsByPhoneNumbers(query);
+
+            long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
+            assertEquals(baseRows, result.size(), "todas as linhas da base encontradas");
+            assertEquals("R0", result.get(11000000000L));
+            assertEquals("R6", result.get(11000000006L));
+            assertTrue(elapsedMs < 15_000,
+                    "lote de " + query.size() + " números levou " + elapsedMs + " ms (esperado < 15s)");
+        }
     }
 
     // ---------- CsvInputReader ----------
