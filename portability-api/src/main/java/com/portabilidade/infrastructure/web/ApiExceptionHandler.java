@@ -22,13 +22,24 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
-    /** ResponseStatusException lançado pelos controllers → ProblemDetail com o status original. */
-    @ExceptionHandler(ResponseStatusException.class)
-    public ProblemDetail handleResponseStatus(ResponseStatusException ex) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(ex.getStatusCode(), ex.getReason());
-        pd.setTitle("Requisicao invalida");
-        pd.setType(java.net.URI.create("https://portabilidade.errors/bad-request"));
-        return pd;
+    /**
+     * ResponseStatusException é ErrorResponseException. Em Spring 6.1, um
+     * @ExceptionHandler proprio para ela causaria ambiguidade de mapeamento com
+     * o handler global herdado (erro na inicializacao do advice) — e remover o
+     * advice inteiro faria o standalone MockMvc cair no DefaultHandlerExceptionResolver,
+     * que nao resolve ResponseStatusException (vira 400). Entao mantemos a
+     * classe registrada apenas por handlers proprios validos abaixo; o tratamento
+     * RFC 7807 de ResponseStatusException vem dos hooks protegidos sobrescritos.
+     */
+
+    /** 4xx/5xx programaticos dos controllers → ProblemDetail com status original. */
+    @Override
+    protected ResponseEntity<Object> handleErrorResponseException(
+            org.springframework.web.ErrorResponseException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        ProblemDetail pd = ex.getBody();
+        pd.setType(java.net.URI.create("https://portabilidade.errors/" + status.value()));
+        return new ResponseEntity<>(pd, headers, status);
     }
 
     @Override
@@ -50,13 +61,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return fe.getField() + ": " + fe.getDefaultMessage();
     }
 
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+    /**
+     * MaxUploadSizeExceededException ja consta na mapping global de
+     * ResponseEntityExceptionHandler (handleException generico). Anotar um
+     * handler local com @ExceptionHandler para a mesma excecao causa erro de
+     * ambiguidade no Spring 6.1 — por isso sobrescrevemos o hook protegido.
+     */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE,
                 "arquivo enviado excede o limite configurado");
         pd.setTitle("Payload muito grande");
         pd.setType(java.net.URI.create("https://portabilidade.errors/payload-too-large"));
-        return pd;
+        return new ResponseEntity<>(pd, headers, status);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
