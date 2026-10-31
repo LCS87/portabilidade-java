@@ -78,20 +78,51 @@ public class CsvOutputWriter {
     }
 
     /** Writer de CSV em streaming: grava linha a linha, header automático. */
-    public static final class StreamingCsvWriter implements Closeable {
+    public static class StreamingCsvWriter implements Closeable {
         private final Path outputPath;
-        private final BufferedWriter writer;
-        private String[] headers;          // definidos na primeira linha
+        final BufferedWriter writer;
+        String[] headers;
         private long rowsWritten;
         private boolean closed;
 
         StreamingCsvWriter(Path outputPath) throws IOException {
+            this(outputPath, true);
+        }
+
+        /**
+         * Construtor protegido para uso por subclasses em outros módulos (API/Fase 2).
+         * @param withBom BOM UTF-8 apenas para outputs "Excel-friendly" do batch legado;
+         *                resultados de API usam CSV puro.
+         */
+        public StreamingCsvWriter(Path outputPath, boolean withBom) throws IOException {
             this.outputPath = outputPath;
             // UTF-8 com BOM para compatibilidade com Excel
             this.writer = new BufferedWriter(
                     new OutputStreamWriter(new FileOutputStream(outputPath.toFile()),
                             StandardCharsets.UTF_8), WRITE_BUFFER_BYTES);
-            this.writer.write('\uFEFF');
+            if (withBom) {
+                this.writer.write('\uFEFF');
+            }
+        }
+
+        /** Escreve um header fixo antes da primeira linha (usado pela API — Fase 2). */
+        public void writeHeader(List<String> columns) throws IOException {
+            if (headers != null || rowsWritten > 0) {
+                throw new IllegalStateException("header ja escrito");
+            }
+            headers = columns.toArray(new String[0]);
+            StringBuilder hl = new StringBuilder();
+            for (int i = 0; i < headers.length; i++) {
+                if (i > 0) hl.append(SEPARATOR);
+                hl.append(escapeField(headers[i]));
+            }
+            writer.write(hl.toString());
+            writer.newLine();
+        }
+
+        /** Libera o buffer para o disco sem fechar o arquivo (progresso visível durante execução). */
+        public void flush() throws IOException {
+            writer.flush();
         }
 
         public void writeRow(Map<String, Object> row) throws IOException {

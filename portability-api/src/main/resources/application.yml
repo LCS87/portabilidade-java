@@ -1,0 +1,46 @@
+# Fase 2 (PLANO_MELHORIAS): configuração da API REST hexagonal.
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,text/csv
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: portability-api
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 110MB
+  threads:
+    virtual:
+      # Java 21 + Spring Boot 3.3: Tomcat atende requisições em virtual threads
+      enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+app:
+  data:
+    # base-dir: pasta onde ficam Operadoras*.csv, prefixos_operadora.json e portabilidade.duckdb
+    base-dir: ${user.dir}
+    # duckdb-path / operadores-csv / prefixos-json: override explícito (opcional)
+  cache:
+    enabled: true
+    ttl-minutes: 360
+    max-size: 500000
+  batch:
+    upload-dir: target/api-upload
+    output-dir: target/api-output
+    chunk-size: 50000
+    max-rows: 1000000
+
+logging:
+  level:
+    root: INFO
+    com.portabilidade: INFO

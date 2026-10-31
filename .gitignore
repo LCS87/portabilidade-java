@@ -1,15 +1,8 @@
 target/
-*.class
-*.jar
-*.war
-*.ear
-.idea/
-.vscode/
-*.iml
-.project
-.classpath
-.settings/
-.DS_Store
-Thumbs.db
-*.log
-*.tmp
+logs/
+*.duckdb
+
+# Frontend
+portability-frontend/node_modules/
+portability-frontend/dist/
+.angular/

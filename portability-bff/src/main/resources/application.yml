@@ -1,0 +1,20 @@
+server:
+  port: 8081
+  compression:
+    enabled: true
+
+spring:
+  codec:
+    max-in-memory-size: 64MB
+  threads:
+    virtual:
+      enabled: true   # Netty + handlers bloqueantes em virtual threads (Java 21)
+
+bff:
+  api:
+    base-url: ${BFF_API_BASE_URL:http://localhost:8080}
+    timeout-seconds: 60
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
