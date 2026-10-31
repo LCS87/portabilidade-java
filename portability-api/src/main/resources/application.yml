@@ -18,6 +18,18 @@ spring:
     virtual:
       # Java 21 + Spring Boot 3.3: Tomcat atende requisições em virtual threads
       enabled: true
+  rabbitmq:
+    # Fase 4: fila duravel de jobs batch (usada apenas com FEATURE_BATCH_QUEUE=true)
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    listener:
+      simple:
+        concurrency: ${BATCH_WORKER_CONCURRENCY:2-8}   # workers por instância
+        prefetch: 1                                    # 1 job por worker em execução
+        acknowledge-mode: auto
 
 springdoc:
   swagger-ui:
@@ -39,8 +51,36 @@ app:
     output-dir: target/api-output
     chunk-size: 50000
     max-rows: 1000000
+    queue:
+      # Feature flag da Fase 4: true -> jobs vao para a fila RabbitMQ
+      # (QueuedBatchExecutor + BatchJobListener); false -> executor local
+      # em memoria com virtual threads (comportamento padrao da Fase 2).
+      enabled: ${FEATURE_BATCH_QUEUE:false}
+  features:
+    cache-enabled: ${FEATURE_CACHE:true}
 
 logging:
   level:
     root: INFO
     com.portabilidade: INFO
+
+# ── Fase 4: escalabilidade & observabilidade ────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true          # /actuator/health/liveness + /readiness (K8s)
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 0.1         # amostragem OTLP; subir via env em incidentes
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}
+
