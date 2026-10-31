@@ -1,29 +1,33 @@
 package com.portabilidade.application;
 
 import com.portabilidade.application.config.AppPaths;
-import com.portabilidade.infrastructure.file.*;
+import com.portabilidade.infrastructure.file.FileScanner;
+import com.portabilidade.infrastructure.file.InputFileReader;
 import com.portabilidade.infrastructure.output.CsvOutputWriter;
 import com.portabilidade.service.PortabilityResolutionService;
 import com.portabilidade.service.ProcessResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.nio.file.*;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
  * Orquestrador principal do processamento batch.
+ * Coordena: scanner → leitura (streaming) → normalização → resolução → escrita incremental.
  *
- * Responsabilidades:
- *  1. Garantir criação das pastas necessárias (entrada/, saida/).
- *  2. Escanear a pasta entrada/ em busca de arquivos .csv e .xlsx.
- *  3. Para cada arquivo: ler → processar → enriquecer → escrever saída.
- *  4. Tratar erros por arquivo de forma isolada (erro em um não impede os demais).
+ * Fase 1 (PLANO_MELHORIAS): fluxo 100% streaming — linhas são lidas, resolvidas
+ * em lotes deduplicados e gravadas conforme chegam; nada além de um lote fica
+ * em memória. A conexão DuckDB é única por execução e liberada no finally.
  */
 public class PortabilityBatchProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(PortabilityBatchProcessor.class);
+
+    /** Tamanho do lote de resolução em streaming (linhas lidas por chamada ao service). */
+    static final int STREAM_CHUNK_SIZE = 50_000;
 
     private final AppPaths paths;
     private final PortabilityResolutionService resolutionService;
@@ -43,98 +47,118 @@ public class PortabilityBatchProcessor {
         this.outputWriter = outputWriter;
     }
 
-    /**
-     * Executa o processamento batch completo.
-     */
+    /** Executa o pipeline completo sobre todos os arquivos na pasta de entrada. */
     public void run() {
-        log.info("=== Portabilidade Numérica Batch - Iniciando ===");
+        long start = System.currentTimeMillis();
+        log.info("Iniciando processamento batch");
 
-        // 1. Garantir que as pastas necessárias existam
-        ensureDirectories();
-
-        // 2. Escanear arquivos de entrada
-        List<String> inputFiles = fileScanner.scan(paths.getInputDir());
-        if (inputFiles.isEmpty()) {
-            log.warn("Nenhum arquivo encontrado em '{}'. Encerrando.", paths.getInputDir());
-            return;
-        }
-
-        int success = 0, failed = 0;
-
-        // 3. Processar cada arquivo individualmente
-        for (String filePath : inputFiles) {
-            try {
-                processFile(filePath);
-                success++;
-            } catch (Exception e) {
-                log.error("Erro ao processar arquivo '{}': {} — pulando para o próximo.",
-                        filePath, e.getMessage(), e);
-                failed++;
+        try {
+            // 1. Obter lista de arquivos da pasta de entrada
+            List<String> inputFiles = fileScanner.scan(paths.getInputDir());
+            if (inputFiles.isEmpty()) {
+                log.warn("Nenhum arquivo encontrado na pasta de entrada: {}", paths.getInputDir());
+                return;
             }
-        }
+            log.info("{} arquivo(s) encontrados", inputFiles.size());
 
-        log.info("=== Processamento concluído: {} OK, {} com erro ===", success, failed);
+            // 2. Processar cada arquivo individualmente (fluxo streaming)
+            for (String filePath : inputFiles) {
+                processFile(filePath);
+            }
+
+            long elapsed = System.currentTimeMillis() - start;
+            log.info("Processamento concluído em {} ms", elapsed);
+        } finally {
+            // Conexão única do DuckDB liberada ao fim da execução
+            resolutionService.close();
+        }
     }
 
-    private void processFile(String filePath) {
+    /**
+     * Processa um único arquivo de entrada em streaming: lê chunks de linhas,
+     * resolve e grava incrementalmente sem materializar o arquivo inteiro.
+     */
+    public void processFile(String filePath) {
+        log.info("Processando: {}", filePath);
         String fileName = Path.of(filePath).getFileName().toString();
-        log.info("--- Processando: {} ---", fileName);
 
-        // 4. Selecionar o leitor adequado (CSV ou Excel)
         InputFileReader reader = fileReaders.stream()
                 .filter(r -> r.supports(filePath))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Nenhum leitor para: " + fileName));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Nenhum leitor disponível para o arquivo: " + filePath));
 
-        // 5. Ler o arquivo de entrada
-        List<Map<String, String>> inputRows = reader.read(filePath);
-        if (inputRows.isEmpty()) {
-            log.warn("Arquivo '{}' está vazio — ignorando.", fileName);
+        Iterator<Map<String, String>> source = reader.stream(filePath);
+        if (!source.hasNext()) {
+            log.warn("Arquivo vazio ou sem dados: {}", fileName);
             return;
         }
 
-        // 6. Extrair lista de telefones (coluna "telefone")
-        boolean hasPhoneColumn = inputRows.get(0).containsKey("telefone");
-        if (!hasPhoneColumn) {
-            log.warn("Arquivo '{}' não possui coluna 'telefone' — ignorando.", fileName);
-            return;
-        }
-
-        List<String> phones = inputRows.stream()
-                .map(row -> row.getOrDefault("telefone", ""))
-                .toList();
-
-        // 7. Processar números via serviço de resolução
-        ProcessResult result = resolutionService.processNumbers(phones);
-
-        // 8. Enriquecer as linhas originais com operadora e fonte_consulta.
-        //    Indexado por POSIÇÃO (ProcessResult usa listas paralelas): duplicatas ou
-        //    formatações diferentes do mesmo telefone não colidem mais (Fase 0/1).
-        List<Map<String, Object>> outputRows = new ArrayList<>(inputRows.size());
-        for (int i = 0; i < inputRows.size(); i++) {
-            Map<String, String> inputRow = inputRows.get(i);
-            Map<String, Object> outputRow = new LinkedHashMap<>(inputRow);
-            outputRow.put("operadora", result.operatorAt(i));
-            outputRow.put("fonte_consulta", result.sourceAt(i));
-            outputRows.add(outputRow);
-        }
-
-        // 9. Escrever arquivo de saída
-        String baseName = fileName.replaceAll("(?i)\\.(csv|xlsx)$", "");
-        String outputFile = outputWriter.write(outputRows, baseName, paths.getOutputDir());
-        if (outputFile != null) {
-            log.info("Saída gerada: {}", outputFile);
+        try {
+            CsvOutputWriter.StreamingCsvWriter out =
+                    outputWriter.open(Path.of(filePath).getFileName().toString(), paths.getOutputDir());
+            boolean ok = false;
+            try {
+                List<Map<String, String>> chunk = new ArrayList<>(STREAM_CHUNK_SIZE);
+                while (source.hasNext()) {
+                    chunk.add(source.next());
+                    if (chunk.size() >= STREAM_CHUNK_SIZE) {
+                        writeChunk(out, chunk);
+                        chunk.clear();
+                    }
+                }
+                if (!chunk.isEmpty()) {
+                    writeChunk(out, chunk);
+                    chunk.clear();
+                }
+                ok = out.rowsWritten() > 0;
+            } finally {
+                if (ok) out.finish(); else out.abort();
+            }
+            if (ok) {
+                log.info("Arquivo gerado: {} ({} linhas)", out.path(), out.rowsWritten());
+            } else {
+                log.warn("Nenhuma linha válida em '{}'; saída descartada", fileName);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Erro ao processar arquivo: " + filePath, e);
         }
     }
 
-    private void ensureDirectories() {
-        for (String dir : new String[]{paths.getInputDir(), paths.getOutputDir()}) {
-            try {
-                Files.createDirectories(Path.of(dir));
-                log.debug("Diretório garantido: {}", dir);
-            } catch (Exception e) {
-                log.warn("Não foi possível criar diretório '{}': {}", dir, e.getMessage());
-            }
+    /** Resolve um chunk e escreve as linhas enriquecidas (ordem preservada). */
+    private void writeChunk(CsvOutputWriter.StreamingCsvWriter out,
+                            List<Map<String, String>> chunk) throws IOException {
+        List<String> rawNumbers = extractPhoneColumn(chunk);
+        ProcessResult result = resolutionService.processNumbers(rawNumbers);
+
+        List<Map<String, Object>> enriched = enrichRowsByPosition(chunk, result);
+        for (Map<String, Object> row : enriched) {
+            out.writeRow(row);
         }
+    }
+
+    /** Extrai a coluna "telefone" de cada linha (null se ausente). */
+    private List<String> extractPhoneColumn(List<Map<String, String>> rows) {
+        List<String> numbers = new ArrayList<>(rows.size());
+        for (Map<String, String> row : rows) {
+            numbers.add(row.get("telefone"));
+        }
+        return numbers;
+    }
+
+    /** Enriquecimento por posição: mantém todas as colunas originais na ordem original. */
+    private List<Map<String, Object>> enrichRowsByPosition(List<Map<String, String>> inputRows,
+                                                           ProcessResult result) {
+        List<Map<String, Object>> enriched = new ArrayList<>(inputRows.size());
+        Long[] operators = result.operators();
+        String[] sources = result.sources();
+
+        for (int i = 0; i < inputRows.size(); i++) {
+            Map<String, Object> newRow = new LinkedHashMap<>(inputRows.get(i));
+            newRow.put("operadora", operators[i]);
+            newRow.put("fonte_consulta", sources[i]);
+            enriched.add(newRow);
+        }
+        return enriched;
     }
 }

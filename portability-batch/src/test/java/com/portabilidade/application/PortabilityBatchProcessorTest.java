@@ -32,8 +32,13 @@ class PortabilityBatchProcessorTest {
     private AppPaths paths;
     private final List<InputFileReader> readers = List.of(new CsvInputReader());
 
+    /** Contagem de chamadas ao repo — usada para verificar deduplicação em lote. */
+    private static final java.util.concurrent.atomic.AtomicInteger repoCalls =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     /** Stub: DuckDB encontra apenas 11987654321 → rn1 55321 (CLARO). */
     private static final PortabilityRepository STUB_REPO = numbers -> {
+        repoCalls.incrementAndGet();
         if (numbers.contains(11987654321L)) return Map.of(11987654321L, "55321");
         return Map.of();
     };
@@ -108,6 +113,32 @@ class PortabilityBatchProcessorTest {
         buildProcessor().run();
         assertFalse(Path.of(paths.getOutputDir()).toFile().exists()
                 && listOutput().size() > 0);
+    }
+
+    @Test
+    @DisplayName("streaming em chunks: arquivo maior que o chunk é processado por lotes")
+    void streamsInChunks() throws Exception {
+        Path inputDir = Path.of(paths.getInputDir());
+        Files.createDirectories(inputDir);
+        StringBuilder csv = new StringBuilder("telefone\n");
+        int n = PortabilityBatchProcessor.STREAM_CHUNK_SIZE + 137; // força 2 chunks
+        for (int i = 0; i < n; i++) {
+            csv.append(i == 0 ? "11987654321" : "4188888888" + "").append('\n');
+        }
+        Files.writeString(inputDir.resolve("grande.csv"), csv.toString(), StandardCharsets.UTF_8);
+
+        int callsBefore = repoCalls.get();
+        buildProcessor().run();
+        int callsAfter = repoCalls.get();
+
+        List<Path> outputs = listOutput();
+        assertEquals(1, outputs.size());
+        String content = Files.readString(outputs.get(0), StandardCharsets.UTF_8);
+        String[] lines = content.replace("\uFEFF", "").trim().split("\\R");
+        assertEquals(n + 1, lines.length, "header + todas as linhas preservadas");
+        assertTrue(lines[1].contains("CLARO"));
+        // 2 chunks → exatamente 2 chamadas ao repositório (fluxo em lotes, não linha a linha)
+        assertEquals(2, callsAfter - callsBefore, "resolução em lote por chunk");
     }
 
     @Test
