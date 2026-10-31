@@ -20,3 +20,21 @@ services:
       - ./prefixos_operadora.json:/app/prefixos_operadora.json:ro
     # Roda o batch uma vez e encerra (--rm remove o container ao final)
     restart: "no"
+
+  # Fase 2: API REST hexagonal (Spring Boot 3.3 / Java 21) — porta 8080
+  portability-api:
+    build:
+      context: .
+      dockerfile: Dockerfile-api
+    image: portability-api:latest
+    container_name: portability-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./base_portabilidade:/app/base_portabilidade
+      - ./saida:/app/saida
+      - ./logs:/app/logs
+      - ./Operadoras.csv:/app/Operadoras.csv:ro
+      - ./Operadoras_completo.csv:/app/Operadoras_completo.csv:ro
+      - ./prefixos_operadora.json:/app/prefixos_operadora.json:ro
+    restart: unless-stopped
