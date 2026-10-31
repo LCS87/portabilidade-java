@@ -1316,3 +1316,49 @@ java.lang.IllegalArgumentException: Nenhum leitor para: lixo.xlsx
 2026-10-31 18:21:05.362 [main] INFO  c.p.s.PortabilityResolutionService - Resultado: portabilidade=2, prefixo=1, nao_identificado=0, invalido=1
 2026-10-31 18:21:05.363 [main] INFO  c.p.a.PortabilityBatchProcessor - Arquivo gerado: /tmp/junit1106810630932290715/saida/FINAL_20261031_1821_clientes.csv (4 linhas)
 2026-10-31 18:21:05.363 [main] INFO  c.p.a.PortabilityBatchProcessor - Processamento concluído em 4 ms
+2026-10-31 19:51:13.102 [main] INFO  c.p.a.PortabilityBatchProcessor - Iniciando processamento batch
+2026-10-31 19:51:13.159 [main] INFO  c.p.infrastructure.file.FileScanner - Encontrado(s) 2 arquivo(s) em '/tmp/junit4793987906628412886/entrada':
+2026-10-31 19:51:13.162 [main] INFO  c.p.infrastructure.file.FileScanner -   → /tmp/junit4793987906628412886/entrada/bom.csv
+2026-10-31 19:51:13.163 [main] INFO  c.p.infrastructure.file.FileScanner -   → /tmp/junit4793987906628412886/entrada/lixo.xlsx
+2026-10-31 19:51:13.164 [main] INFO  c.p.a.PortabilityBatchProcessor - 2 arquivo(s) encontrados
+2026-10-31 19:51:13.164 [main] INFO  c.p.a.PortabilityBatchProcessor - Processando: /tmp/junit4793987906628412886/entrada/bom.csv
+2026-10-31 19:51:13.171 [main] INFO  c.p.s.PortabilityResolutionService - Processando 1 números...
+2026-10-31 19:51:13.172 [main] INFO  c.p.s.PortabilityResolutionService - DuckDB retornou 1 correspondências de portabilidade
+2026-10-31 19:51:13.173 [main] INFO  c.p.s.PortabilityResolutionService - Resultado: portabilidade=1, prefixo=0, nao_identificado=0, invalido=0
+2026-10-31 19:51:13.174 [main] INFO  c.p.a.PortabilityBatchProcessor - Arquivo gerado: /tmp/junit4793987906628412886/saida/FINAL_20261031_1951_bom.csv (1 linhas)
+2026-10-31 19:51:13.174 [main] INFO  c.p.a.PortabilityBatchProcessor - Processando: /tmp/junit4793987906628412886/entrada/lixo.xlsx
+2026-10-31 19:51:13.174 [main] ERROR c.p.a.PortabilityBatchProcessor - Falha ao processar '/tmp/junit4793987906628412886/entrada/lixo.xlsx': Nenhum leitor disponível para o arquivo: /tmp/junit4793987906628412886/entrada/lixo.xlsx
+2026-10-31 19:51:13.174 [main] INFO  c.p.a.PortabilityBatchProcessor - Processamento concluído em 74 ms
+2026-10-31 19:51:13.179 [main] INFO  c.p.a.PortabilityBatchProcessor - Iniciando processamento batch
+2026-10-31 19:51:13.179 [main] INFO  c.p.infrastructure.file.FileScanner - Encontrado(s) 1 arquivo(s) em '/tmp/junit7063027130445436714/entrada':
+2026-10-31 19:51:13.179 [main] INFO  c.p.infrastructure.file.FileScanner -   → /tmp/junit7063027130445436714/entrada/sem_telefone.csv
+2026-10-31 19:51:13.179 [main] INFO  c.p.a.PortabilityBatchProcessor - 1 arquivo(s) encontrados
+2026-10-31 19:51:13.180 [main] INFO  c.p.a.PortabilityBatchProcessor - Processando: /tmp/junit7063027130445436714/entrada/sem_telefone.csv
+2026-10-31 19:51:13.180 [main] WARN  c.p.a.PortabilityBatchProcessor - Coluna 'telefone' não encontrada em 'sem_telefone.csv'; arquivo ignorado
+2026-10-31 19:51:13.180 [main] INFO  c.p.a.PortabilityBatchProcessor - Processamento concluído em 1 ms
+2026-10-31 19:51:13.191 [main] INFO  c.p.a.PortabilityBatchProcessor - Iniciando processamento batch
+2026-10-31 19:51:13.192 [main] INFO  c.p.infrastructure.file.FileScanner - Encontrado(s) 1 arquivo(s) em '/tmp/junit17992437194167665651/entrada':
+2026-10-31 19:51:13.192 [main] INFO  c.p.infrastructure.file.FileScanner -   → /tmp/junit17992437194167665651/entrada/grande.csv
+2026-10-31 19:51:13.192 [main] INFO  c.p.a.PortabilityBatchProcessor - 1 arquivo(s) encontrados
+2026-10-31 19:51:13.192 [main] INFO  c.p.a.PortabilityBatchProcessor - Processando: /tmp/junit17992437194167665651/entrada/grande.csv
+2026-10-31 19:51:13.690 [main] INFO  c.p.s.PortabilityResolutionService - Processando 50000 números...
+2026-10-31 19:51:14.066 [main] INFO  c.p.s.PortabilityResolutionService - DuckDB retornou 1 correspondências de portabilidade
+2026-10-31 19:51:14.393 [main] INFO  c.p.s.PortabilityResolutionService - Resultado: portabilidade=1, prefixo=0, nao_identificado=49999, invalido=0
+2026-10-31 19:51:14.752 [main] INFO  c.p.s.PortabilityResolutionService - Processando 137 números...
+2026-10-31 19:51:14.754 [main] INFO  c.p.s.PortabilityResolutionService - DuckDB retornou 0 correspondências de portabilidade
+2026-10-31 19:51:14.755 [main] INFO  c.p.s.PortabilityResolutionService - Resultado: portabilidade=0, prefixo=0, nao_identificado=137, invalido=0
+2026-10-31 19:51:14.756 [main] INFO  c.p.a.PortabilityBatchProcessor - Arquivo gerado: /tmp/junit17992437194167665651/saida/FINAL_20261031_1951_grande.csv (50137 linhas)
+2026-10-31 19:51:14.757 [main] INFO  c.p.a.PortabilityBatchProcessor - Processamento concluído em 1566 ms
+2026-10-31 19:51:14.967 [main] INFO  c.p.a.PortabilityBatchProcessor - Iniciando processamento batch
+2026-10-31 19:51:14.967 [main] WARN  c.p.infrastructure.file.FileScanner - Diretório de entrada não existe: /tmp/junit17338821066918748148/entrada
+2026-10-31 19:51:14.967 [main] WARN  c.p.a.PortabilityBatchProcessor - Nenhum arquivo encontrado na pasta de entrada: /tmp/junit17338821066918748148/entrada
+2026-10-31 19:51:14.975 [main] INFO  c.p.a.PortabilityBatchProcessor - Iniciando processamento batch
+2026-10-31 19:51:14.975 [main] INFO  c.p.infrastructure.file.FileScanner - Encontrado(s) 1 arquivo(s) em '/tmp/junit11983289902846318498/entrada':
+2026-10-31 19:51:14.975 [main] INFO  c.p.infrastructure.file.FileScanner -   → /tmp/junit11983289902846318498/entrada/clientes.csv
+2026-10-31 19:51:14.975 [main] INFO  c.p.a.PortabilityBatchProcessor - 1 arquivo(s) encontrados
+2026-10-31 19:51:14.975 [main] INFO  c.p.a.PortabilityBatchProcessor - Processando: /tmp/junit11983289902846318498/entrada/clientes.csv
+2026-10-31 19:51:14.977 [main] INFO  c.p.s.PortabilityResolutionService - Processando 4 números...
+2026-10-31 19:51:14.978 [main] INFO  c.p.s.PortabilityResolutionService - DuckDB retornou 1 correspondências de portabilidade
+2026-10-31 19:51:14.978 [main] INFO  c.p.s.PortabilityResolutionService - Resultado: portabilidade=2, prefixo=1, nao_identificado=0, invalido=1
+2026-10-31 19:51:14.979 [main] INFO  c.p.a.PortabilityBatchProcessor - Arquivo gerado: /tmp/junit11983289902846318498/saida/FINAL_20261031_1951_clientes.csv (4 linhas)
+2026-10-31 19:51:14.979 [main] INFO  c.p.a.PortabilityBatchProcessor - Processamento concluído em 4 ms

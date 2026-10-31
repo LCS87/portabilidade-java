@@ -69,10 +69,17 @@ portabilidade-java/                       # Parent POM (multi-módulo, Java 21)
 │       ├── output/      (CsvOutputWriter)
 │       ├── repository/  (DuckDbPortabilityRepository)
 │       └── resolver/    (JsonPrefixResolver)
-└── portability-batch/                    # ← Camada de entrada (main + orquestração)
+├── portability-batch/                    # ← Camada de entrada (main + orquestração)
+│   └── src/main/java/com/portabilidade/
+│       ├── PortabilityApplication.java   # Ponto de entrada (main)
+│       └── application/PortabilityBatchProcessor.java
+└── portability-api/                      # ← API REST hexagonal (Spring Boot 3.3 / Java 21)
     └── src/main/java/com/portabilidade/
-        ├── PortabilityApplication.java   # Ponto de entrada (main)
-        └── application/PortabilityBatchProcessor.java
+        ├── application/usecase/          # Casos de uso (ConsultPortability, SubmitBatch)
+        └── infrastructure/
+            ├── web/                      # Controllers, DTOs, RFC 7807, OpenAPI
+            ├── repository/               # Adapter DuckDB + cache Caffeine
+            └── batch/                    # Executor de jobs de batch (multipart CSV/XLSX)
 ```
 
 ---
@@ -336,6 +343,42 @@ Todos os caminhos são resolvidos a partir do diretório onde o jar roda
 
 Para usar um dicionário de operadoras externo, basta colocar um
 `Operadoras_completo.csv` (colunas `Nome da Prestadora;RN1`) na pasta do projeto.
+
+---
+
+## API REST (Fase 2 — Spring Boot 3.3 / Java 21)
+
+O módulo `portability-api` expõe a mesma lógica de negócio do batch como serviço HTTP,
+com arquitetura hexagonal (use cases no centro, adapters de web/persistência nas bordas).
+
+### Executar
+
+```bash
+mvn -pl portability-api -am package
+java -jar portability-api/target/portability-api-1.0.0-boot.jar
+# porta padrão: 8080 | Swagger UI: http://localhost:8080/swagger-ui.html
+```
+
+### Endpoints
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/api/v1/portabilidade/consultar` | Consulta 1..N números (sync, máx. 1000 por request, deduplicados, cache Caffeine) |
+| `POST` | `/api/v1/portabilidade/batch` | Upload multipart CSV/XLSX → retorna job ID (`202 Accepted`) |
+| `GET` | `/api/v1/portabilidade/batch/{id}` | Status/progresso do job |
+| `GET` | `/api/v1/portabilidade/batch/{id}/resultado` | Download do CSV de resultado |
+
+Exemplo:
+
+```bash
+curl -s localhost:8080/api/v1/portabilidade/consultar \
+  -H 'Content-Type: application/json' \
+  -d '{"numeros":["11987654321","2125551234"]}'
+```
+
+Erros seguem **RFC 7807 ProblemDetails** (`application/problem+json`) e o contrato
+OpenAPI 3 está em `/v3/api-docs`. Requisições são atendidas em **virtual threads**
+(Java 21) com compressão gzip habilitada.
 
 ---
 

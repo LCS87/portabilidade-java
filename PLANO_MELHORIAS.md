@@ -84,20 +84,24 @@ Objetivo: alinhar toolchain e criar rede de segurança antes de refatorar.
 
 **Resultado:** `mvn clean verify` verde — 55 testes (34 core + 11 adapters/benchmark + ... incluindo batch), Checkstyle + JaCoCo ok, benchmark automatizado como gate de regressão de performance (<30s; atual ~1,2s).
 
-### Fase 2 — API REST com arquitetura hexagonal (~2–3 semanas)
-- [ ] Módulo `api` (Spring Boot 3.x, Java 21):
-  - `POST /api/v1/portabilidade/consultar` — 1..N números (sync, limitado)
-  - `POST /api/v1/portabilidade/batch` — upload multipart CSV/XLSX → retorna job ID
+### Fase 2 — API REST com arquitetura hexagonal (~2–3 semanas) ✅ CONCLUÍDA
+- [x] Módulo `portability-api` (Spring Boot 3.3, Java 21, boot jar `-boot.jar`):
+  - `POST /api/v1/portabilidade/consultar` — 1..N números (sync, máx. 1000, deduplicados)
+  - `POST /api/v1/portabilidade/batch` — upload multipart CSV/XLSX → retorna job ID (`202`)
   - `GET  /api/v1/portabilidade/batch/{id}` — status/progresso
-  - `GET  /api/v1/portabilidade/batch/{id}/resultado` — download
-- [ ] Respeitar a hexagonal na prática:
-  - `application/` = use cases (`ConsultPortabilityUseCase`, `SubmitBatchUseCase`) dependendo só de ports
-  - `infrastructure/web` = controllers + DTOs/mappers; `infrastructure/persistence` = adapter DuckDB existente
-  - Composição via `@Configuration` (elimina DI manual do `main`)
-- [ ] Contratos: **OpenAPI 3** (`springdoc-openapi`) + versões de API (`/v1`), erros padronizados (**RFC 7807 ProblemDetails**)
-- [ ] Validação de entrada (`jakarta.validation`), limites de payload, deduplicação de números na request
-- [ ] **Cache**: resultados de portabilidade são relativamente estáveis → Caffeine (L1, hot numbers) com TTL configurável; avaliar Redis (L2) para múltiplas réplicas
-- [ ] Testes: contrato (`@WebMvcTest`), integração com DuckDB embarcado, carga básica (k6/Gatling) — meta p95 < 50 ms single lookup com cache
+  - `GET  /api/v1/portabilidade/batch/{id}/resultado` — download CSV
+- [x] Hexagonal na prática:
+  - `application/usecase` = `ConsultPortabilityUseCase`, `SubmitBatchUseCase` dependendo só de ports
+  - `infrastructure/web` = controllers + DTOs/mappers; `infrastructure/repository` = adapter DuckDB + cache; `infrastructure/batch` = executor de jobs
+  - Composição via `@Configuration`/Spring DI
+- [x] Contratos: **OpenAPI 3** (`springdoc-openapi`, `/v3/api-docs` + Swagger UI), versionamento `/v1`, erros **RFC 7807 ProblemDetails**
+- [x] Validação de entrada (`jakarta.validation`), limites de payload (multipart 100 MB), deduplicação de números
+- [x] **Cache**: Caffeine L1 com TTL configurável (Redis L2 avaliado na Fase 4)
+- [x] Testes: web layer (`MockMvc` standalone), use cases unitários, integração batch E2E — build verde com 70 testes no total
+- [x] Virtual threads habilitadas (`spring.threads.virtual.enabled=true`) + compressão gzip
+- [x] Docs/entrega: seção "API REST" no README, `Dockerfile-api` + serviço `portability-api` no docker-compose
+
+**Resultado:** `mvn clean verify` BUILD SUCCESS — 70 testes (51 legados + 19 da API), Checkstyle/JaCoCo ok, smoke test do boot jar validado (endpoint consultar + swagger).
 
 ### Fase 3 — BFF + Frontend Angular 17+ (~2–4 semanas)
 - [ ] Módulo **`bff`** (Spring Boot dedicado ao frontend):
