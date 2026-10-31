@@ -31,14 +31,14 @@ ou `nao_identificado`).
 
 | Ferramenta | Versão | Verificação |
 |------------|--------|-------------|
-| JDK | 17+ (testado com 24) | `java -version` |
-| Apache Maven | 3.8+ | `mvn -version` |
+| JDK | 21+ (LTS, testado com Temurin 21) | `java -version` |
+| Apache Maven | 3.9+ | `mvn -version` |
 | Memória RAM | recomendado 4 GB+ | — |
 
-> O projeto compila com `source/target` 17. No Windows, se o Maven reclamar de
-> `JAVA_HOME`, defina antes de rodar os comandos:
+> O projeto compila com `release` 21 (multi-módulo Maven). No Windows, se o Maven
+> reclamar de `JAVA_HOME`, defina antes de rodar os comandos:
 > ```powershell
-> $env:JAVA_HOME = "C:\Program Files\Java\jdk-24"
+> $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
 > ```
 
 ---
@@ -46,34 +46,33 @@ ou `nao_identificado`).
 ## Estrutura do projeto
 
 ```
-portabilidade-java/
-├── pom.xml                         # Build Maven (fat-jar via assembly)
-├── Operadoras.csv                  # Dicionário de EXEMPLO (3 operadoras)
-├── Operadoras_completo.csv         # Dicionário COMPLETO (738 operadoras, 100% cobertura)
-├── prefixos_operadora.json         # Mapa prefixo(7d) → operadora (fallback)
+portabilidade-java/                       # Parent POM (multi-módulo, Java 21)
+├── pom.xml                               # Build Maven (CI: JaCoCo + Checkstyle)
+├── .github/workflows/ci.yml              # Pipeline de CI (build + testes + quality gate)
+├── Operadoras.csv                        # Dicionário de EXEMPLO (3 operadoras)
+├── Operadoras_completo.csv               # Dicionário COMPLETO (738 operadoras, 100% cobertura)
+├── prefixos_operadora.json               # Mapa prefixo(7d) → operadora (fallback)
 ├── base_portabilidade/
-│   └── portabilidade.duckdb        # Base oficial de portabilidade (~56 M registros)
-├── entrada/                        # Coloque AQUI os .csv/.xlsx de entrada
-├── saida/                          # O programa gera AQUI os FINAL_*.csv
-├── logs/                           # portabilidade.log
-└── src/
-    ├── main/java/com/portabilidade/
-    │   ├── PortabilityApplication.java        # Ponto de entrada (main)
-    │   ├── application/
-    │   │   ├── PortabilityBatchProcessor.java  # Orquestrador batch
-    │   │   └── config/AppPaths.java            # Resolução de caminhos
-    │   ├── service/
-    │   │   ├── PhoneNormalizer.java            # Normalização de números
-    │   │   ├── PortabilityResolutionService.java
-    │   │   └── ProcessResult.java
-    │   ├── infrastructure/
-    │   │   ├── file/        (leitores CSV/Excel, scanner)
-    │   │   ├── loader/      (carga de Operadoras.csv e prefixos JSON)
-    │   │   ├── output/      (CsvOutputWriter)
-    │   │   ├── repository/  (DuckDbPortabilityRepository)
-    │   │   └── resolver/    (JsonPrefixResolver)
-    │   └── domain/          (modelos e exceções)
-    └── test/java/com/portabilidade/service/   # Testes JUnit 5
+│   └── portabilidade.duckdb              # Base oficial de portabilidade (~56 M registros)
+├── entrada/                              # Coloque AQUI os .csv/.xlsx de entrada
+├── saida/                                # O programa gera AQUI os FINAL_*.csv
+├── logs/                                 # portabilidade.log
+├── portability-core/                     # ← Domínio + Aplicação + Portas (hexágono central)
+│   └── src/main/java/com/portabilidade/
+│       ├── domain/    (modelos, exceções)
+│       ├── application/  (casos de uso, portas/interfaces)
+│       └── service/   (PhoneNormalizer, PortabilityResolutionService, ProcessResult)
+├── portability-adapters/                 # ← Adaptadores de saída (infraestrutura)
+│   └── src/main/java/com/portabilidade/infrastructure/
+│       ├── file/        (leitores CSV/Excel, scanner)
+│       ├── loader/      (carga de Operadoras.csv e prefixos JSON)
+│       ├── output/      (CsvOutputWriter)
+│       ├── repository/  (DuckDbPortabilityRepository)
+│       └── resolver/    (JsonPrefixResolver)
+└── portability-batch/                    # ← Camada de entrada (main + orquestração)
+    └── src/main/java/com/portabilidade/
+        ├── PortabilityApplication.java   # Ponto de entrada (main)
+        └── application/PortabilityBatchProcessor.java
 ```
 
 ---
@@ -90,11 +89,16 @@ mvn clean package
 Isso gera o **fat-jar** executável:
 
 ```
-target/portabilidade-java.jar
+portability-batch/target/portabilidade-java.jar
 ```
 
 > O jar já inclui todas as dependências (DuckDB, POI, OpenCSV, Jackson, Logback)
-> graças ao `maven-assembly-plugin` (`jar-with-dependencies`).
+> graças ao `maven-assembly-plugin` (`jar-with-dependencies`) montado no módulo
+> `portability-batch`.
+
+O `mvn verify` também executa o **quality gate** do CI local: Checkstyle (estilo) e
+JaCoCo (cobertura mínima configurada no parent POM). Os relatórios ficam em
+`*/target/site/jacoco/`.
 
 Para compilar **sem rodar os testes** (mais rápido):
 
@@ -120,7 +124,7 @@ Carlos;1133334444
 ### 2. Execute o jar
 
 ```powershell
-java -jar target/portabilidade-java.jar
+java -jar portability-batch/target/portabilidade-java.jar
 ```
 
 O programa vai:

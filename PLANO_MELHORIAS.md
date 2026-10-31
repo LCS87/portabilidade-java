@@ -58,18 +58,21 @@ de serviço com API + frontend, preservando o código que já funciona.
 
 ## 3. Roadmap por fases
 
-### Fase 0 — Fundações (quick wins, ~1 semana)
+### Fase 0 — Fundações (quick wins, ~1 semana) ✅ CONCLUÍDA
 Objetivo: alinhar toolchain e criar rede de segurança antes de refatorar.
 
-- [ ] Migrar `pom.xml` para **Java 21** (`maven.compiler.release=21`, `<java.version>21</java.version>`); usar virtual threads desde já onde fizer sentido
-- [ ] Introduzir **Spring Boot 3.3+** como parent/BOM mantendo o jar batch funcionando (dois artefatos: `portability-core` e `portability-app`)
-- [ ] Criar **CI** (GitHub Actions/GitLab CI): build + testes + `jacoco` (gate inicial de cobertura ≥70% no core) + `spotbugs`/Checkstyle
-- [ ] Extrair módulos Maven multi-módulo:
-  - `core` (domain + service + ports — zero dependências de infra)
-  - `adapters` (DuckDB, JSON, CSV/XLSX)
-  - `batch` (CLI atual, thin)
+- [x] Migrar `pom.xml` para **Java 21** (`maven.compiler.release=21`, `<java.version>21</java.version>`); usar virtual threads desde já onde fizer sentido
+- [x] Introduzir **Spring Boot 3.3+** como parent/BOM mantendo o jar batch funcionando (dois artefatos: `portability-core` e `portability-app`) *(BOM gerenciado no parent; aplicação Spring Boot efetiva na Fase 2)*
+- [x] Criar **CI** (GitHub Actions/GitLab CI): build + testes + `jacoco` (gate inicial de cobertura ≥70% no core) + `spotbugs`/Checkstyle
+- [x] Extrair módulos Maven multi-módulo:
+  - `core` (domain + service + ports — zero dependências de infra) → `portability-core`
+  - `adapters` (DuckDB, JSON, CSV/XLSX) → `portability-adapters`
+  - `batch` (CLI atual, thin) → `portability-batch`
   - `api` / `bff` (novos, Fase 2–3)
-- [ ] Cobrir com **testes de integração** (Testcontainers ou DuckDB em tmpfs): `DuckDbPortabilityRepository`, `CsvInputReader`, `ExcelInputReader`, `CsvOutputWriter` (hoje só unit tests com mocks)
+- [x] Cobrir com **testes de integração** (Testcontainers ou DuckDB em tmpfs): `DuckDbPortabilityRepository`, `CsvInputReader`, `ExcelInputReader`, `CsvOutputWriter` (hoje só unit tests com mocks) → `AdaptersIntegrationTest` (9 testes)
+- [x] Extra: corrigir chave do `ProcessResult` (colisão de telefones formatados — antecipado da Fase 1) e atualizar Dockerfile/README para a estrutura multi-módulo
+
+**Resultado:** `mvn clean verify` verde — 48 testes (34 core + 9 adapters + 5 batch), Checkstyle + JaCoCo executando no quality gate, fat-jar em `portability-batch/target/portabilidade-java.jar`.
 
 ### Fase 1 — Performance e correções do núcleo (~1–2 semanas)
 - [ ] **Batch query eficiente no DuckDB**: substituir `IN (?×5000)` por staging table temporária + `JOIN` (ou `UNNEST`); medir ganho com dataset sintético de 1M números
