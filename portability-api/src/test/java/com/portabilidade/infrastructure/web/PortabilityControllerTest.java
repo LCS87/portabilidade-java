@@ -41,7 +41,7 @@ class PortabilityControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new PortabilityController(buildUseCase()))
+        mockMvc = MockMvcBuilders.standaloneSetup(new PortabilityController(buildUseCase(), Map.of("123", "TESTE OPERADORA")))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }

@@ -25,7 +25,7 @@
         <module>portability-adapters</module>
         <module>portability-batch</module>
         <module>portability-api</module>
-        <!-- Fase 3: <module>portability-bff</module> -->
+        <module>portability-bff</module>
     </modules>
 
     <properties>
