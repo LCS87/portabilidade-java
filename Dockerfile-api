@@ -3,20 +3,21 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
-# Copia os POMs do multi-módulo primeiro para aproveitar o cache do Docker
+# O parent declara 5 módulos: todos os POMs precisam existir para o reactor.
 COPY pom.xml .
 COPY portability-core/pom.xml portability-core/
 COPY portability-adapters/pom.xml portability-adapters/
 COPY portability-batch/pom.xml portability-batch/
 COPY portability-api/pom.xml portability-api/
-RUN mvn -B -q dependency:go-offline || true
+COPY portability-bff/pom.xml portability-bff/
+COPY config config
+RUN mvn -B -q -ntp -pl portability-api -am dependency:go-offline || true
 
-# Copia o código-fonte e compila (boot jar do módulo portability-api)
+# Copia o código-fonte necessário e compila (boot jar do módulo portability-api)
 COPY portability-core/src portability-core/src
 COPY portability-adapters/src portability-adapters/src
-COPY portability-batch/src portability-batch/src
 COPY portability-api/src portability-api/src
-RUN mvn -B -q clean package -DskipTests
+RUN mvn -B -q -ntp -pl portability-api -am clean package -DskipTests
 
 # ---- Stage 2: runtime ----
 FROM eclipse-temurin:21-jre

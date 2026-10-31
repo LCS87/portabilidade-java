@@ -26,7 +26,8 @@ spring:
     password: ${RABBITMQ_PASS:guest}
     listener:
       simple:
-        concurrency: ${BATCH_WORKER_CONCURRENCY:2-8}   # workers por instância
+        concurrency: ${BATCH_WORKER_CONCURRENCY:2}      # workers mínimos por instância
+        max-concurrency: ${BATCH_WORKER_MAX_CONCURRENCY:8} # limite de workers
         prefetch: 1                                    # 1 job por worker em execução
         acknowledge-mode: auto
 
@@ -73,6 +74,11 @@ management:
     health:
       probes:
         enabled: true          # /actuator/health/liveness + /readiness (K8s)
+  health:
+    rabbit:
+      # A fila é opcional: sem FEATURE_BATCH_QUEUE=true não faz sentido o
+      # /actuator/health ficar DOWN só porque o RabbitMQ local não está rodando.
+      enabled: ${FEATURE_BATCH_QUEUE:false}
   metrics:
     tags:
       application: ${spring.application.name}

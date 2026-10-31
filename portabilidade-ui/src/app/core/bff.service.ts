@@ -26,13 +26,20 @@ export interface ResumoDashboard {
   porFonte: { fonte: string; quantidade: number }[];
 }
 
-export interface BatchStatus {
-  jobId?: string;
+export interface BatchSubmission {
+  jobId: string;
   status: string;
-  processados?: number;
-  total?: number;
-  erros?: number;
-  [k: string]: unknown;
+  arquivo?: string | null;
+}
+
+export interface BatchStatus {
+  jobId: string;
+  status: string;
+  processados: number;
+  total: number;
+  erros: number;
+  progressoPct: number;
+  erro: string | null;
 }
 
 /** Serviço de acesso ao BFF — endpoints orientados a tela (Fase 3). */
@@ -51,10 +58,10 @@ export class BffService {
     return this.http.post<ResumoDashboard>(`${this.base}/dashboard/resumo`, { consultas });
   }
 
-  enviarLote(arquivo: File): Observable<{ jobId: string; status: string }> {
+  enviarLote(arquivo: File): Observable<BatchSubmission> {
     const form = new FormData();
     form.append('arquivo', arquivo);
-    return this.http.post<{ jobId: string; status: string }>(`${this.base}/batch`, form);
+    return this.http.post<BatchSubmission>(`${this.base}/batch`, form);
   }
 
   statusLote(jobId: string): Observable<BatchStatus> {

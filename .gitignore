@@ -6,3 +6,10 @@ dist/
 build/
 .angular/
 *.duckdb
+*.db
+*.db-wal
+*.db-shm
+
+# Base oficial grande e fat jar gerado na raiz (não versionar)
+/base_portabilidade/
+/portabilidade-java.jar

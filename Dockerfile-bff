@@ -1,0 +1,26 @@
+# BFF WebFlux (Spring Boot 3.3 / Java 21)
+# ---- Stage 1: build ----
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /build
+
+COPY pom.xml .
+COPY portability-core/pom.xml portability-core/
+COPY portability-adapters/pom.xml portability-adapters/
+COPY portability-batch/pom.xml portability-batch/
+COPY portability-api/pom.xml portability-api/
+COPY portability-bff/pom.xml portability-bff/
+COPY config config
+RUN mvn -B -q -ntp -pl portability-bff -am dependency:go-offline || true
+
+COPY portability-bff/src portability-bff/src
+RUN mvn -B -q -ntp -pl portability-bff -am clean package -DskipTests
+
+# ---- Stage 2: runtime ----
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+
+COPY --from=build /build/portability-bff/target/portability-bff-*-boot.jar /app/portability-bff.jar
+
+EXPOSE 8081
+
+CMD ["java", "-jar", "/app/portability-bff.jar"]

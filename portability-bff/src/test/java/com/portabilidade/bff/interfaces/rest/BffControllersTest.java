@@ -32,7 +32,7 @@ class BffControllersTest {
         @Override
         public Mono<Map<String, Object>> batchStatus(String id) {
             return Mono.just(Map.of("id", id, "status", "COMPLETED",
-                    "linhasProcessadas", 10L, "totalLinhas", 10L));
+                    "linhasProcessadas", 10L, "totalLinhas", 10L, "erro", ""));
         }
         @Override
         public Mono<byte[]> batchResultCsv(String id) {
@@ -70,7 +70,11 @@ class BffControllersTest {
         client.get().uri("/bff/v1/batch/job-1")
                 .exchange().expectStatus().isOk()
                 .expectBody()
+                .jsonPath("$.jobId").isEqualTo("job-1")
                 .jsonPath("$.status").isEqualTo("COMPLETED")
+                .jsonPath("$.processados").isEqualTo(10)
+                .jsonPath("$.total").isEqualTo(10)
+                .jsonPath("$.erros").isEqualTo(0)
                 .jsonPath("$.progressoPct").isEqualTo(100);
     }
 

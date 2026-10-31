@@ -1,14 +1,22 @@
 name: CI
 
-# Fase 0 do PLANO_MELHORIAS.md — build + testes + cobertura (gate jacoco ≥70% no core)
 on:
   push:
     branches: ["**"]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  backend:
+    name: Backend (Maven verify + boot smoke)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -19,10 +27,46 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Build, test e verify (jacoco check + checkstyle)
+      - name: Build, test e verify (jacoco + checkstyle)
         run: mvn -B -ntp clean verify
 
-      - name: Publicar relatório de cobertura (artifact)
+      - name: Smoke test — API sobe com fila desligada
+        run: |
+          set -euo pipefail
+          java -jar portability-api/target/portability-api-*-boot.jar \
+            --server.port=18080 > /tmp/api-default.log 2>&1 &
+          API_PID=$!
+          trap 'kill $API_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:18080/actuator/health >/tmp/health-default.json; then
+              cat /tmp/health-default.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API não respondeu em 80s"; cat /tmp/api-default.log; exit 1
+
+      - name: Smoke test — API sobe com fila ligada
+        run: |
+          set -euo pipefail
+          java -jar portability-api/target/portability-api-*-boot.jar \
+            --server.port=18081 \
+            --app.batch.queue.enabled=true \
+            --spring.rabbitmq.listener.simple.auto-startup=false \
+            --spring.rabbitmq.listener.direct.auto-startup=false \
+            > /tmp/api-queue.log 2>&1 &
+          API_PID=$!
+          trap 'kill $API_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:18081/actuator/health/liveness >/tmp/health-queue.json; then
+              cat /tmp/health-queue.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API (fila) não respondeu em 80s"; cat /tmp/api-queue.log; exit 1
+
+      - name: Publicar relatórios de cobertura
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -30,9 +74,68 @@ jobs:
           path: "**/target/site/jacoco/"
           retention-days: 14
 
-      - name: Publicar fat jar (artifact)
+      - name: Publicar jars
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: portabilidade-java-batch
-          path: portability-batch/target/portabilidade-java.jar
+          name: portability-jars
+          path: |
+            portability-batch/target/portabilidade-java.jar
+            portability-api/target/*-boot.jar
+            portability-bff/target/*-boot.jar
           retention-days: 14
+
+  frontend:
+    name: Frontend (Angular build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: portabilidade-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: portabilidade-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests (ChromeHeadless)
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+
+      - name: Build production
+        run: npm run build -- --configuration production
+
+      - name: Publicar bundle Angular
+        uses: actions/upload-artifact@v4
+        with:
+          name: angular-dist
+          path: portabilidade-ui/dist/portabilidade-ui/browser/
+          retention-days: 14
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build batch image
+        run: docker build -f Dockerfile -t portabilidade-java:ci .
+
+      - name: Build API image
+        run: docker build -f Dockerfile-api -t portability-api:ci .
+
+      - name: Build BFF image
+        run: docker build -f Dockerfile-bff -t portability-bff:ci .
+
+      - name: Build UI image
+        run: docker build -f Dockerfile-ui -t portability-ui:ci .

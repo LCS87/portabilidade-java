@@ -230,9 +230,31 @@ Get-ChildItem saida/
 ### Limpar o container/imagem
 
 ```powershell
-docker compose down          # remove o container
-docker rmi portabilidade-java:latest   # remove a imagem
+docker compose down          # remove os containers
+docker compose down -v       # remove também volumes anônimos
+docker rmi portabilidade-java:latest portability-api:latest portability-bff:latest portability-ui:latest
 ```
+
+### Stack completa (API + BFF + UI + RabbitMQ)
+
+A Fase 0 adicionou imagens para todos os componentes. O compose sobe:
+
+| Serviço | URL | Imagem |
+|---------|-----|--------|
+| UI Angular (nginx) | http://localhost:4200 | `Dockerfile-ui` |
+| BFF WebFlux | http://localhost:8081 | `Dockerfile-bff` |
+| API REST | http://localhost:8080 | `Dockerfile-api` |
+| RabbitMQ (opcional) | http://localhost:15672 | imagem oficial |
+
+```powershell
+docker compose build
+docker compose up -d portability-api portability-bff portability-ui rabbitmq
+# UI: http://localhost:4200
+# Para usar a fila durável: $env:FEATURE_BATCH_QUEUE="true"; docker compose up -d
+```
+
+O nginx da UI faz proxy same-origin de `/bff/` para o BFF, então o bundle de
+produção usa `bffBaseUrl: '/bff/v1'` (sem host fixo e sem CORS no browser).
 
 ---
 
@@ -320,9 +342,19 @@ Principais melhorias já aplicadas (ver `README_MELHORIAS.md`):
 mvn test
 ```
 
-Executa a suíte JUnit 5 (20 testes em `PhoneNormalizerTest` e
-`PortabilityResolutionServiceTest`), cobrindo normalização, resolução por DuckDB,
-fallback de prefixo, números inválidos e preservação de fixos.
+Executa a suíte JUnit 5 de todos os módulos Maven. A contagem varia com a evolução
+do projeto (na Fase 0 são **91 testes**: core, adapters, batch, API e BFF), cobrindo
+normalização, resolução por DuckDB, fallback de prefixo, números inválidos,
+preservação de fixos, streaming do batch e contratos API/BFF.
+
+Para o build completo com cobertura e smoke de contexto:
+
+```powershell
+mvn clean verify
+```
+
+> A suíte inclui testes `@SpringBootTest` que sobem o contexto da API com a fila
+> ligada e desligada, impedindo a regressão do conflito de beans `BatchExecutor`.
 
 ---
 
@@ -363,7 +395,7 @@ java -jar portability-api/target/portability-api-1.0.0-boot.jar
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `POST` | `/api/v1/portabilidade/consultar` | Consulta 1..N números (sync, máx. 1000 por request, deduplicados, cache Caffeine) |
+| `POST` | `/api/v1/portabilidade/consultar` | Consulta 1..N números (sync, máx. 100 por request, deduplicados, cache Caffeine) |
 | `POST` | `/api/v1/portabilidade/batch` | Upload multipart CSV/XLSX → retorna job ID (`202 Accepted`) |
 | `GET` | `/api/v1/portabilidade/batch/{id}` | Status/progresso do job |
 | `GET` | `/api/v1/portabilidade/batch/{id}/resultado` | Download do CSV de resultado |

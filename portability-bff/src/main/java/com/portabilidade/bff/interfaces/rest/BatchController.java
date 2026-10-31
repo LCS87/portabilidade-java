@@ -1,6 +1,8 @@
 package com.portabilidade.bff.interfaces.rest;
 
 import com.portabilidade.bff.application.BatchService;
+import com.portabilidade.bff.application.BatchStatus;
+import com.portabilidade.bff.application.BatchSubmission;
 import org.springframework.http.HttpHeaders;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.MediaType;
@@ -14,8 +16,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.util.Map;
 
 /** Endpoints da tela de upload/batch: submit, progresso (SSE + polling) e download. */
 @RestController
@@ -31,21 +31,21 @@ public class BatchController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Mono<Map<String, Object>> submit(@RequestPart("arquivo") FilePart file) {
+    public Mono<BatchSubmission> submit(@RequestPart("arquivo") FilePart file) {
         return readAll(file).flatMap(content ->
                 batchService.submit(content, file.filename()));
     }
 
-    /** SSE: emite o status a cada 2s até COMPLETED/FAILED. */
+    /** SSE: primeira emissão imediata e depois a cada 2s até COMPLETED/FAILED. */
     @GetMapping(value = "/{id}/progresso", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<Map<String, Object>> progresso(@PathVariable String id) {
+    public Flux<BatchStatus> progresso(@PathVariable String id) {
         return batchService.monitor(id);
     }
 
-    /** Polling simples (alternativa ao SSE para clients mais antigos). */
+    /** Polling simples: uma leitura imediata do status. */
     @GetMapping("/{id}")
-    public Mono<Map<String, Object>> status(@PathVariable String id) {
-        return batchService.monitor(id).take(1).single();
+    public Mono<BatchStatus> status(@PathVariable String id) {
+        return batchService.status(id);
     }
 
     @GetMapping("/{id}/resultado")

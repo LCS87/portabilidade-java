@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
-import java.io.File;
 
 /**
  * Resolve todos os caminhos usados pela aplicação a partir do BASE_DIR.
@@ -60,20 +59,13 @@ public class AppPaths {
     public String getPrefixosJson()    { return resolve("prefixos_operadora.json"); }
 
     /**
-     * Caminho para um dicionário de operadoras mais completo (fallback).
-     * Prioriza o CSV completo local (Operadoras_completo.csv) e, se não existir,
-     * tenta o CSV externo com cobertura total de RN1.
+     * Caminho para o dicionário de operadoras mais completo.
+     * O arquivo é opcional e deve estar dentro de BASE_DIR; não há caminho
+     * absoluto específico de máquina (isso quebrava containers/onboarding).
      */
     public String getOperadoresCsvCompleto() {
-        // Lista de locais candidatos para um CSV completo de operadoras.
-        String[] candidatos = {
-                resolve("Operadoras_completo.csv"),
-                "D:\\ConsultaOperadoraAPI\\Operadoras.csv"
-        };
-        for (String c : candidatos) {
-            if (new File(c).exists()) return c;
-        }
-        return null;
+        String completo = resolve("Operadoras_completo.csv");
+        return new File(completo).exists() ? completo : null;
     }
 
     private String resolve(String... parts) {

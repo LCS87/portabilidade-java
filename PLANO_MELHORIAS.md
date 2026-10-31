@@ -1,4 +1,9 @@
-# Plano de Melhorias — Portabilidade Numérica
+# Plano de Melhorias - Portabilidade Numérica
+
+> **Documento histórico.** Este plano foi substituído por
+> [`PLANO_MELHORIAS_V2.md`](PLANO_MELHORIAS_V2.md), que reflete o estado atual
+> (6 módulos Maven, API/BFF/UI) e o roadmap a partir da Fase 0. Mantido apenas
+> para rastreabilidade das fases 1–4 já parcialmente implementadas.
 
 **Stack-alvo:** Java 21+ · Spring Boot 3.x · Angular 17+ · API REST · Arquitetura Hexagonal · BFF
 **Premissa:** o projeto atual é um batch CLI (Java 17, sem framework) com núcleo de domínio bem separado

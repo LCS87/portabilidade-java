@@ -1,17 +1,23 @@
 # Ignora tudo que não é necessário para o build/run no container
-target/
-*.class
-*.jar
+**/target/
+**/*.class
+**/*.jar
 .git/
 .gitignore
 .kiro/
 .idea/
 *.iml
 *.log
-logs/*
-saida/*
-entrada/*
+logs/
+saida/
+entrada/
 README_MELHORIAS.md
+
+# Dependências/artefatos do frontend (o build roda npm ci dentro da imagem)
+**/node_modules/
+**/dist/
+**/.angular/
+**/coverage/
 
 # A base de portabilidade é grande (~1,6 GB); é montada via volume no compose.
 # Os CSVs/JSON abaixo SÃO copiados para a imagem (não ignorar).

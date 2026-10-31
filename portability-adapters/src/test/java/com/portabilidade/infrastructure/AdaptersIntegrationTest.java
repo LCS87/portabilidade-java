@@ -52,14 +52,15 @@ class AdaptersIntegrationTest {
 
         }
 
-        var repo = new DuckDbPortabilityRepository(db.toString());
-        Map<Long, String> result = repo.findOperatorsByPhoneNumbers(
-                List.of(11933334444L, 21912345678L, 31999999999L, 4188888888L));
+        try (var repo = new DuckDbPortabilityRepository(db.toString())) {
+            Map<Long, String> result = repo.findOperatorsByPhoneNumbers(
+                    List.of(11933334444L, 21912345678L, 31999999999L, 4188888888L));
 
-        assertEquals("55321", result.get(11933334444L), "fallback 11d→10d deve mapear de volta");
-        assertEquals("12345", result.get(21912345678L));
-        assertFalse(result.containsKey(31999999999L), "rn1 em branco deve ser descartado");
-        assertFalse(result.containsKey(4188888888L));
+            assertEquals("55321", result.get(11933334444L), "fallback 11d→10d deve mapear de volta");
+            assertEquals("12345", result.get(21912345678L));
+            assertFalse(result.containsKey(31999999999L), "rn1 em branco deve ser descartado");
+            assertFalse(result.containsKey(4188888888L));
+        }
     }
 
     @Test

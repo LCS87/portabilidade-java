@@ -15,9 +15,12 @@ import { BffService, BatchStatus } from '../../core/bff.service';
       <div class="status">
         <p><strong>Job:</strong> {{ jobId() }}</p>
         <p><strong>Status:</strong> {{ status()?.status ?? '—' }}</p>
+        @if (status()?.erro) { <p class="error">{{ status()?.erro }}</p> }
         @if (total > 0) {
           <progress [value]="processados" [max]="total"></progress>
           <p>{{ processados }} / {{ total }} linhas · erros: {{ erros }}</p>
+        } @else {
+          <p>{{ processados }} linhas processadas</p>
         }
         @if (concluido()) {
           <a class="download" [href]="urlResultado()">⬇ Baixar resultado (CSV)</a>
@@ -57,11 +60,21 @@ export class LoteComponent implements OnDestroy {
     if (!file) return;
     this.erro.set(null);
     this.concluido.set(false);
+    this.status.set(null);
     this.enviando.set(true);
     this.bff.enviarLote(file).subscribe({
       next: (r) => {
         this.enviando.set(false);
         this.jobId.set(r.jobId);
+        this.status.set({
+          jobId: r.jobId,
+          status: r.status,
+          processados: 0,
+          total: 0,
+          erros: 0,
+          progressoPct: 0,
+          erro: null,
+        });
         this.iniciarPolling(r.jobId);
       },
       error: (e) => {
@@ -74,21 +87,26 @@ export class LoteComponent implements OnDestroy {
   /** Polling a cada 2s (alternativa simples ao SSE — funciona atrás de proxies). */
   private iniciarPolling(id: string): void {
     this.pararPolling();
-    this.timer = setInterval(() => {
-      this.bff.statusLote(id).subscribe({
-        next: (s) => {
-          this.status.set(s);
-          const done = ['COMPLETED', 'FAILED', 'DONE', 'CONCLUIDO'].includes(
-            String(s.status).toUpperCase(),
-          );
-          if (done) {
-            this.concluido.set(String(s.status).toUpperCase() !== 'FAILED');
-            this.pararPolling();
-          }
-        },
-        error: () => this.pararPolling(),
-      });
-    }, 2000);
+    this.consultarStatus(id);
+    this.timer = setInterval(() => this.consultarStatus(id), 2000);
+  }
+
+  private consultarStatus(id: string): void {
+    this.bff.statusLote(id).subscribe({
+      next: (s) => {
+        this.status.set(s);
+        const status = String(s.status).toUpperCase();
+        const done = ['COMPLETED', 'FAILED', 'DONE', 'CONCLUIDO'].includes(status);
+        if (done) {
+          this.concluido.set(status !== 'FAILED');
+          this.pararPolling();
+        }
+      },
+      error: (e) => {
+        this.erro.set(e?.error?.detail ?? e?.message ?? 'Falha ao consultar o status do lote.');
+        this.pararPolling();
+      },
+    });
   }
 
   urlResultado(): string {

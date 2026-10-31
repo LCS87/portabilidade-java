@@ -7,7 +7,7 @@ import { ConsultaComponent } from './consulta';
 /** Wrapper que dispara consultar() automaticamente com entrada pré-definida. */
 @Component({ selector: 'x', template: '' })
 class Wrapper extends ConsultaComponent implements OnInit {
-  override ngOnInit(): void {
+  ngOnInit(): void {
     this.entrada = '+5511999999999, +5521988887777';
     this.consultar();
   }
@@ -29,7 +29,7 @@ describe('ConsultaComponent', () => {
     const comp = fixture.componentInstance;
     fixture.detectChanges();
 
-    const req = httpMock.expectOne((u) => u.endsWith('/consulta'));
+    const req = httpMock.expectOne((u) => u.url.endsWith('/consulta'));
     expect(req.request.body.numeros).toEqual(['+5511999999999', '+5521988887777']);
     req.flush({
       total: 2,

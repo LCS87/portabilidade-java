@@ -2,24 +2,27 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
-# Copia os POMs do multi-módulo primeiro para aproveitar o cache do Docker
+# O parent declara 5 módulos: todos os POMs precisam existir para o reactor
+# resolver o build, mesmo que só o batch seja compilado (-pl ... -am).
 COPY pom.xml .
 COPY portability-core/pom.xml portability-core/
 COPY portability-adapters/pom.xml portability-adapters/
 COPY portability-batch/pom.xml portability-batch/
-RUN mvn -B -q dependency:go-offline || true
+COPY portability-api/pom.xml portability-api/
+COPY portability-bff/pom.xml portability-bff/
+COPY config config
+RUN mvn -B -q -ntp -pl portability-batch -am dependency:go-offline || true
 
-# Copia o código-fonte e compila o fat-jar
+# Copia apenas o código necessário e compila o fat-jar do batch
 COPY portability-core/src portability-core/src
 COPY portability-adapters/src portability-adapters/src
 COPY portability-batch/src portability-batch/src
-RUN mvn -B -q clean package -DskipTests
+RUN mvn -B -q -ntp -pl portability-batch -am clean package -DskipTests
 
 # ---- Stage 2: runtime ----
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Copia o jar gerado (fat-jar montado pelo módulo portability-batch)
 COPY --from=build /build/portability-batch/target/portabilidade-java.jar /app/portabilidade-java.jar
 
 # Copia os dados auxiliares (dicionários, prefixos).

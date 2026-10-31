@@ -21,7 +21,23 @@ services:
     # Roda o batch uma vez e encerra (--rm remove o container ao final)
     restart: "no"
 
-  # Fase 2: API REST hexagonal (Spring Boot 3.3 / Java 21) — porta 8080
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: portability-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # API REST hexagonal (Spring Boot 3.3 / Java 21) — porta 8080
   portability-api:
     build:
       context: .
@@ -30,6 +46,13 @@ services:
     container_name: portability-api
     ports:
       - "8080:8080"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
+      # false = executor local (virtual threads); true = fila RabbitMQ
+      FEATURE_BATCH_QUEUE: ${FEATURE_BATCH_QUEUE:-false}
     volumes:
       - ./base_portabilidade:/app/base_portabilidade
       - ./saida:/app/saida
@@ -37,4 +60,36 @@ services:
       - ./Operadoras.csv:/app/Operadoras.csv:ro
       - ./Operadoras_completo.csv:/app/Operadoras_completo.csv:ro
       - ./prefixos_operadora.json:/app/prefixos_operadora.json:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # BFF WebFlux — endpoints orientados à tela Angular
+  portability-bff:
+    build:
+      context: .
+      dockerfile: Dockerfile-bff
+    image: portability-bff:latest
+    container_name: portability-bff
+    ports:
+      - "8081:8081"
+    environment:
+      BFF_API_BASE_URL: http://portability-api:8080
+      BFF_CORS_ALLOWED_ORIGINS: http://localhost:4200
+    depends_on:
+      - portability-api
+    restart: unless-stopped
+
+  # UI Angular servida por nginx; /bff/ é proxy same-origin para o BFF
+  portability-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile-ui
+    image: portability-ui:latest
+    container_name: portability-ui
+    ports:
+      - "4200:80"
+    depends_on:
+      - portability-bff
     restart: unless-stopped

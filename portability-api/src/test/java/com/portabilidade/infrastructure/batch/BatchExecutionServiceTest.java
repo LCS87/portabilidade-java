@@ -31,11 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class BatchExecutionServiceTest {
 
-    /** Repo fake: 11999998888 tem portabilidade para VIVO; demais, none. */
+    /** Repo fake: 11999998888 tem portabilidade para o RN1 15 (VIVO); demais, none. */
     private static final class FakeRepo implements PortabilityRepository {
         @Override
         public Map<Long, String> findOperatorsByPhoneNumbers(List<Long> numbers) {
-            return numbers.contains(11999998888L) ? Map.of(11999998888L, "VIVO") : Map.of();
+            return numbers.contains(11999998888L) ? Map.of(11999998888L, "15") : Map.of();
         }
     }
 
@@ -55,7 +55,7 @@ class BatchExecutionServiceTest {
     private static BatchExecutionService service(Path outDir, int chunkSize, long maxRows) {
         PortabilityResolutionService resolution = new PortabilityResolutionService(
                 new FakeRepo(), new FakePrefixResolver(), new PhoneNormalizer(),
-                Map.of("CLARO", "12", "VIVO", "15"));
+                Map.of("15", "VIVO", "12", "CLARO"));
         List<InputFileReader> readers = List.of(new CsvInputReader());
         return new BatchExecutionService(readers, resolution, NO_METRICS,
                 outDir.toString(), chunkSize, maxRows);
@@ -96,7 +96,8 @@ class BatchExecutionServiceTest {
     @Test
     void missingPhoneColumnFailsJobWithoutOutput(@TempDir Path tmp) throws IOException {
         Path file = tmp.resolve("sem-coluna.csv");
-        Files.writeString(file, "numero\n11999998888\n", StandardCharsets.UTF_8);
+        // "contato" não é alias de telefone (diferente de "numero", que é aceito).
+        Files.writeString(file, "contato\n11999998888\n", StandardCharsets.UTF_8);
         BatchExecutionService svc = service(tmp, 1000, 1_000_000);
         BatchJob job = new BatchJob("job-2", "sem-coluna.csv");
 
