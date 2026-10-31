@@ -1,16 +1,15 @@
 target/
 *.class
 *.jar
-*.log
-logs/
+*.war
+*.ear
 .idea/
+.vscode/
 *.iml
+.project
+.classpath
+.settings/
 .DS_Store
-saida/
-
-# Base DuckDB oficial (~2,7 GB) — NÃO vai para o GitHub.
-# Baixe/cole localmente em base_portabilidade/portabilidade.duckdb após clonar.
-base_portabilidade/
-
-# Arquivos de entrada (voláteis, geralmente grandes)
-entrada/
+Thumbs.db
+*.log
+*.tmp
