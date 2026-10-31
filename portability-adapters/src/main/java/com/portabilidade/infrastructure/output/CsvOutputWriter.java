@@ -82,6 +82,7 @@ public class CsvOutputWriter {
         private final Path outputPath;
         final BufferedWriter writer;
         String[] headers;
+        private final char separator;
         private long rowsWritten;
         private boolean closed;
 
@@ -89,13 +90,19 @@ public class CsvOutputWriter {
             this(outputPath, true);
         }
 
+        public StreamingCsvWriter(Path outputPath, boolean withBom) throws IOException {
+            this(outputPath, withBom, SEPARATOR);
+        }
+
         /**
          * Construtor protegido para uso por subclasses em outros módulos (API/Fase 2).
          * @param withBom BOM UTF-8 apenas para outputs "Excel-friendly" do batch legado;
          *                resultados de API usam CSV puro.
+         * @param separator ';' (padrão legado/Excel) ou ',' (consumo programático — Fase 4).
          */
-        public StreamingCsvWriter(Path outputPath, boolean withBom) throws IOException {
+        public StreamingCsvWriter(Path outputPath, boolean withBom, char separator) throws IOException {
             this.outputPath = outputPath;
+            this.separator = separator;
             // UTF-8 com BOM para compatibilidade com Excel
             this.writer = new BufferedWriter(
                     new OutputStreamWriter(new FileOutputStream(outputPath.toFile()),
@@ -113,7 +120,7 @@ public class CsvOutputWriter {
             headers = columns.toArray(new String[0]);
             StringBuilder hl = new StringBuilder();
             for (int i = 0; i < headers.length; i++) {
-                if (i > 0) hl.append(SEPARATOR);
+                if (i > 0) hl.append(separator);
                 hl.append(escapeField(headers[i]));
             }
             writer.write(hl.toString());
@@ -130,7 +137,7 @@ public class CsvOutputWriter {
                 headers = row.keySet().toArray(new String[0]);
                 StringBuilder hl = new StringBuilder();
                 for (int i = 0; i < headers.length; i++) {
-                    if (i > 0) hl.append(SEPARATOR);
+                    if (i > 0) hl.append(separator);
                     hl.append(escapeField(headers[i]));
                 }
                 writer.write(hl.toString());
@@ -139,7 +146,7 @@ public class CsvOutputWriter {
             StringBuilder line = new StringBuilder();
             int i = 0;
             for (String h : headers) {
-                if (i++ > 0) line.append(SEPARATOR);
+                if (i++ > 0) line.append(separator);
                 Object v = row.get(h);
                 line.append(escapeField(v == null ? "" : v.toString()));
             }

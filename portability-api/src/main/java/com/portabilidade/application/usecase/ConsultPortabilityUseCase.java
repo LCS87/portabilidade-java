@@ -1,5 +1,6 @@
 package com.portabilidade.application.usecase;
 
+import io.micrometer.core.annotation.Timed;
 import com.portabilidade.service.PhoneNormalizer;
 import com.portabilidade.service.PortabilityResolutionService;
 import com.portabilidade.service.ProcessResult;
@@ -34,6 +35,8 @@ public class ConsultPortabilityUseCase {
      * @return resultado posicional do core (raw/operators/sources na mesma ordem)
      * @throws IllegalArgumentException se vazio ou acima do limite
      */
+    @Timed(value = "portability_consult_seconds", histogram = true,
+           extraTags = {"layer", "usecase"})   // Fase 4: latência p50/p95/p99 no Prometheus
     public ProcessResult consult(List<String> rawNumbers) {
         if (rawNumbers == null || rawNumbers.isEmpty()) {
             throw new IllegalArgumentException("lista de numeros vazia");

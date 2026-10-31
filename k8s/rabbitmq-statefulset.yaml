@@ -1,0 +1,44 @@
+# Fase 4: broker durável para a fila portability.batch (FEATURE_BATCH_QUEUE=true)
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: portabilidade
+spec:
+  selector: { app: rabbitmq }
+  ports:
+    - { name: amqp, port: 5672, targetPort: 5672 }
+    - { name: mgmt, port: 15672, targetPort: 15672 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: portabilidade
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management-alpine
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/rabbitmq }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: { requests: { storage: 5Gi } }
