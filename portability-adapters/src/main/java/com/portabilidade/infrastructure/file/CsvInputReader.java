@@ -26,8 +26,11 @@ public class CsvInputReader implements InputFileReader {
 
     private static final Logger log = LoggerFactory.getLogger(CsvInputReader.class);
 
-    // Variantes de nome de coluna que serão mapeadas para "telefone"
-    private static final List<String> PHONE_COLUMN_ALIASES = List.of(
+    // Variantes de nome de coluna que serão mapeadas para "telefone".
+    // Fase 4: apenas igualdade estrita (sem contains) — aliases como "numero"
+    // colidiam com colunas legítimas ("numero_pedido", "numero_contrato") e
+    // corrompiam o header, fazendo a busca por "telefone" falhar no pipeline.
+    private static final Set<String> PHONE_COLUMN_ALIASES = Set.of(
             "telefone", "fone", "celular", "numero", "número", "tel",
             "phone", "mobile", "msisdn", "ddd_numero", "nr_telefone"
     );
@@ -139,12 +142,9 @@ public class CsvInputReader implements InputFileReader {
             String h = raw[i].trim().toLowerCase()
                     .replaceAll("[\"']", "")
                     .replaceAll("\\s+", "_");
-            // Mapeia aliases para "telefone"
-            for (String alias : PHONE_COLUMN_ALIASES) {
-                if (h.equals(alias) || h.contains(alias)) {
-                    h = "telefone";
-                    break;
-                }
+            // Mapeia aliases para "telefone" — igualdade estrita apenas
+            if (PHONE_COLUMN_ALIASES.contains(h)) {
+                h = "telefone";
             }
             result[i] = h.isEmpty() ? "col_" + i : h;
         }
