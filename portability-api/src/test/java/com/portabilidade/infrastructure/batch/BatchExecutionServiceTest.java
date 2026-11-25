@@ -31,11 +31,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class BatchExecutionServiceTest {
 
-    /** Repo fake: 11999998888 tem portabilidade para VIVO; demais, none. */
+    /** Repo fake: retorna RN1 (não o nome) — o dicionário mapeia 15 → VIVO. */
     private static final class FakeRepo implements PortabilityRepository {
         @Override
         public Map<Long, String> findOperatorsByPhoneNumbers(List<Long> numbers) {
-            return numbers.contains(11999998888L) ? Map.of(11999998888L, "VIVO") : Map.of();
+            return numbers.contains(11999998888L) ? Map.of(11999998888L, "15") : Map.of();
         }
     }
 
@@ -87,16 +87,19 @@ class BatchExecutionServiceTest {
         List<String> lines = Files.readAllLines(Path.of(job.getResultPath()), StandardCharsets.UTF_8);
         assertEquals(4, lines.size()); // header + 3 linhas
         assertEquals("telefone,operadora,fonte_consulta", lines.get(0));
+        // RN1 "15" deve ser traduzido para o nome pelo dicionário (operatorsDict)
         assertTrue(lines.get(1).contains("VIVO"),
-                () -> "portabilidade esperada na linha 2: " + lines.get(1));
+                () -> "nome da operadora (dicionario) esperado na linha 2: " + lines.get(1));
         // arquivo de upload é consumido/deletado ao final
         assertTrue(!Files.exists(in), "arquivo de entrada deve ser removido apos execucao");
     }
 
     @Test
     void missingPhoneColumnFailsJobWithoutOutput(@TempDir Path tmp) throws IOException {
+        // Usa header que NÃO é alias de telefone (e não colide com a lista de
+        // aliases estritos do CsvInputReader/peek, ex.: "numero" → "telefone")
         Path file = tmp.resolve("sem-coluna.csv");
-        Files.writeString(file, "numero\n11999998888\n", StandardCharsets.UTF_8);
+        Files.writeString(file, "cliente,valor\nAna,100\n", StandardCharsets.UTF_8);
         BatchExecutionService svc = service(tmp, 1000, 1_000_000);
         BatchJob job = new BatchJob("job-2", "sem-coluna.csv");
 
