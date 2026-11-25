@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Fase 4: pipeline de execução de batch extraído do InMemoryBatchJobStore
@@ -32,6 +34,11 @@ public class BatchExecutionService {
     static final String PHONE_COLUMN = "telefone";
     static final String OPERATOR_COLUMN = "operadora";
     static final String SOURCE_COLUMN = "fonte_consulta";
+
+    /** Mesmos aliases de coluna do CsvInputReader (igualdade estrita). */
+    private static final Set<String> PHONE_ALIASES = Set.of(
+            "telefone", "fone", "celular", "numero", "número", "tel",
+            "phone", "mobile", "msisdn", "ddd_numero", "nr_telefone");
 
     private final List<InputFileReader> readers;
     private final PortabilityResolutionService resolutionService;
@@ -63,6 +70,23 @@ public class BatchExecutionService {
                 .findFirst().orElse(null);
         if (reader == null) {
             fail(job, "formato nao suportado: envie .csv ou .xlsx");
+            quietDelete(file);
+            return;
+        }
+        // Fase 4: peek do header ANTES de criar o arquivo de saída — se a coluna
+        // 'telefone' não existir (inclusive via aliases), falha rápido sem output
+        // residual no disco (mesma semântica do PortabilityBatchProcessor legado).
+        String phoneHeader;
+        try {
+            phoneHeader = Files.readString(file, StandardCharsets.UTF_8).lines()
+                    .findFirst().map(this::extractPhoneColumnFromHeader).orElse(null);
+        } catch (IOException e) {
+            fail(job, "falha ao ler cabecalho do arquivo: " + e.getMessage());
+            quietDelete(file);
+            return;
+        }
+        if (phoneHeader == null) {
+            fail(job, "coluna 'telefone' obrigatoria nao encontrada no arquivo");
             quietDelete(file);
             return;
         }
@@ -140,6 +164,27 @@ public class BatchExecutionService {
     private static void fail(BatchJob job, String message) {
         job.setErrorMessage(message);
         job.setStatus(BatchJob.Status.FAILED);
+    }
+
+    /**
+     * Extrai do header bruto o nome normalizado da coluna de telefone
+     * (mesma normalização do CsvInputReader: lowercase, trim, aspas removidas,
+     * espaços → '_', aliases mapeados por igualdade estrita).
+     */
+    private String extractPhoneColumnFromHeader(String headerLine) {
+        String hl = headerLine.startsWith("\uFEFF") ? headerLine.substring(1) : headerLine;
+        long semicolons = hl.chars().filter(c -> c == ';').count();
+        long commas = hl.chars().filter(c -> c == ',').count();
+        char sep = (semicolons >= commas) ? ';' : ',';
+        for (String raw : hl.split(String.valueOf(sep), -1)) {
+            String h = raw.trim().toLowerCase()
+                    .replaceAll("[\"']", "")
+                    .replaceAll("\\s+", "_");
+            if (PHONE_ALIASES.contains(h)) {
+                return PHONE_COLUMN;
+            }
+        }
+        return null;
     }
 
     private static void quietDelete(Path p) {
